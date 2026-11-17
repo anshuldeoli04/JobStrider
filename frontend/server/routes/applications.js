@@ -70,7 +70,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-const ALLOWED_STATUSES = new Set(['evaluated', 'applied', 'interview', 'offer', 'rejected', 'withdrawn']);
+const ALLOWED_STATUSES = new Set(['evaluated', 'applied', 'interview', 'offer', 'rejected', 'withdrawn', 'skipped']);
 
 router.patch('/:id', async (req, res, next) => {
   try {

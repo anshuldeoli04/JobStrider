@@ -100,6 +100,12 @@ export async function runNodeScript(scriptName, args = [], options = {}) {
       lines.forEach((line) => options.onLog?.(line, 'stderr'));
     });
 
+    child.on('error', (err) => {
+      const error = new Error(`Failed to start ${scriptName}: ${err.message}`);
+      error.logs = logs;
+      reject(error);
+    });
+
     child.on('close', (code) => {
       if (code === 0) {
         resolve({ code, logs });

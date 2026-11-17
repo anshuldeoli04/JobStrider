@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Tracker
+ * JobStrider Tracker
  * View and manage evaluated job applications.
  * Usage: node tracker.mjs
  */
@@ -52,7 +52,7 @@ function getSortedApps(apps, gradeFilter) {
 function displayTable(apps, page = 1, gradeFilter = null) {
   console.clear();
   console.log("=".repeat(TABLE_WIDTH));
-  console.log("JOB-OPS - Application Tracker");
+  console.log("JobStrider - Application Tracker");
   console.log("=".repeat(TABLE_WIDTH));
 
   const sorted = getSortedApps(apps, gradeFilter);

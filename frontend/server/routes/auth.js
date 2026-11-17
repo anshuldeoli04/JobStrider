@@ -179,6 +179,25 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
+router.post('/local', async (_req, res, next) => {
+  try {
+    const rows = await query(`SELECT * FROM users ORDER BY id ASC LIMIT 1`);
+    let user = rows[0];
+    if (!user) {
+      const result = await query(`
+        INSERT INTO users (name, email, experience_level_id, token_version)
+        VALUES ('JobStrider Operator', 'operator@jobstrider.local', 1, 1)
+      `);
+      user = { id: result.insertId || 1, name: 'JobStrider Operator', email: 'operator@jobstrider.local', token_version: 1 };
+    }
+    await setSessionUserId(user.id);
+    const token = generateToken(user.id, user.token_version || 1);
+    res.json({ user: mapUserRow(user), token });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/logout', async (req, res, next) => {
   try {
     const userId = await resolveCurrentUserId(req);

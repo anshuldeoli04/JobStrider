@@ -9,6 +9,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import readline from "readline";
 import {
+  REPORTS_DIR,
   backupIfNeeded,
   generateApplicationId,
   getExperienceProfile,
@@ -98,7 +99,7 @@ function displayResult(result) {
 function saveReport(result, jobUrl = "") {
   const id = generateApplicationId();
   const timestamp = new Date().toISOString();
-  const reportDir = "./reports";
+  const reportDir = REPORTS_DIR;
   fs.mkdirSync(reportDir, { recursive: true });
 
   const userId = process.env.JOB_OPS_USER_ID || "1";
@@ -148,16 +149,31 @@ ${result.action_items?.map((a, i) => `${i + 1}. ${a}`).join("\n")}
     score: result.score,
     grade: result.grade,
     verdict: result.verdict,
+    fit_summary: result.fit_summary,
+    strengths: result.strengths || [],
+    gaps: result.gaps || [],
+    cv_highlights: result.cv_highlights || [],
+    interview_prep: result.interview_prep || [],
+    negotiation_note: result.negotiation_note || "",
+    action_items: result.action_items || [],
     evaluated_by: result.evaluated_by || "gemini",
     status: "evaluated",
     report_file: reportFile,
   };
   upsertApplication(application);
-  return { id, reportFile };
+  return { id, reportFile, application };
 }
 
 async function main() {
-  console.clear();
+  const args = process.argv.slice(2);
+  const nonInteractive = args.includes("--non-interactive");
+  const jsonOutput = args.includes("--json");
+  const jdFileArg = args.find((a) => a.startsWith("--jd-file="))?.slice("--jd-file=".length);
+  const urlArg = args.find((a) => a.startsWith("--url="))?.slice("--url=".length) || "";
+
+  if (!nonInteractive) {
+    console.clear();
+  }
   logger.info("============================================================");
   logger.info("        JOB-OPS Job Evaluator (Gemini 2.5 Flash Free)");
   logger.info("============================================================\n");
@@ -167,8 +183,8 @@ async function main() {
   const experienceProfile = getExperienceProfile(config);
   let cv = "";
   try {
-    cv = loadCVWithCache("./cv.md");
-    logger.info("CV loaded (cv.md)");
+    cv = loadCVWithCache();
+    logger.info("CV loaded");
     logger.info(`Experience profile: ${experienceProfile.label}`);
     logger.info("-".repeat(60) + "\n");
   } catch (error) {
@@ -176,16 +192,40 @@ async function main() {
     process.exit(1);
   }
 
-  logger.info("Paste Job Description (copied from the target job posting or careers page)");
-  const jd = await getMultilineInput("\n");
+  let jd = "";
+  if (jdFileArg) {
+    if (!fs.existsSync(jdFileArg)) {
+      logger.error(`Job description file not found: ${jdFileArg}`);
+      process.exit(1);
+    }
+    jd = fs.readFileSync(jdFileArg, "utf8");
+  } else if (nonInteractive) {
+    jd = fs.readFileSync(0, "utf8");
+  } else {
+    logger.info("Paste Job Description (copied from the target job posting or careers page)");
+    jd = await getMultilineInput("\n");
+  }
+
+  if ((!jd || jd.trim().length < 50) && urlArg) {
+    try {
+      logger.info(`Fetching job posting via Agent Reach from ${urlArg}...`);
+      const { readJobWithAgentReach } = await import("./src/services/deepJobReader.mjs");
+      const deepRead = await readJobWithAgentReach(urlArg);
+      if (deepRead.ok && deepRead.content && deepRead.content.length >= 50) {
+        jd = `${deepRead.title ? `Title: ${deepRead.title}\n` : ""}${deepRead.content}`;
+        logger.info(`✔ Retrieved job description via Agent Reach (${jd.length} chars).`);
+      }
+    } catch {}
+  }
+
   if (!jd || jd.trim().length < 50) {
     logger.error("Job description is too short. Please provide the full job description.");
     process.exit(1);
   }
 
   const detectedJobUrl = extractRelevantJobUrl(jd);
-  let normalizedJobUrl = detectedJobUrl;
-  if (!normalizedJobUrl) {
+  let normalizedJobUrl = urlArg || detectedJobUrl;
+  if (!normalizedJobUrl && !nonInteractive) {
     const urlInput = await getMultilineInput("Job URL is optional. Paste it on a new line or type DONE to skip:");
     normalizedJobUrl = String(urlInput || "").split(/\s+/).find((token) => /^https?:\/\//i.test(token)) || "";
   }
@@ -207,9 +247,15 @@ async function main() {
       evaluated_by: response?.provider ? `${response.provider}/${response.model}` : "gemini",
     });
 
-    displayResult(result);
-    const { id, reportFile } = saveReport(result, normalizedJobUrl);
-    logger.info(`\nReport saved: ${reportFile}\nTracker updated (ID: ${id})\n\nTo view all tracked applications: node tracker.mjs\n`);
+    if (!jsonOutput) {
+      displayResult(result);
+    }
+    const { id, reportFile, application } = saveReport(result, normalizedJobUrl);
+    if (jsonOutput) {
+      console.log(`EVAL_RESULT_JSON:${JSON.stringify(application)}`);
+    } else {
+      logger.info(`\nReport saved: ${reportFile}\nTracker updated (ID: ${id})\n\nTo view all tracked applications: node tracker.mjs\n`);
+    }
   } catch (err) {
     if (err instanceof SyntaxError) {
       logger.error("Failed to parse Gemini response JSON. Please retry.");

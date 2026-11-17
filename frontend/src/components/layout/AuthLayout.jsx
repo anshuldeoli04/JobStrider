@@ -4,11 +4,10 @@ export default function AuthLayout() {
   return (
     <div className="auth-shell">
       <div className="auth-brand-panel">
-        <div className="brand-mark">JOB-OPS</div>
-        <h1>From CLI workflow to operator-grade job cockpit.</h1>
+        <div className="brand-mark">JobStrider</div>
+        <h1>From autonomous scanning to operator-grade job cockpit.</h1>
         <p>
-          Auth flow is ready with `experience` captured from day one, so later MySQL integration me user profile
-          directly persist ho sake.
+          Auth flow captures your target experience from day one so profile settings and scans persist reliably.
         </p>
         <div className="auth-highlight-grid">
           <div className="glass-card">

@@ -1,16 +1,15 @@
 import pg from 'pg';
 import { loadLocalEnv } from './loadEnv.js';
+import { executeSqliteQuery, getSqliteDb } from './sqliteDb.js';
 
 loadLocalEnv();
 
 const { Pool } = pg;
 
-const required = ['DB_HOST', 'DB_USER', 'DB_NAME'];
+export let useSqliteFallback = !process.env.DB_HOST || process.env.USE_SQLITE === '1';
 
-for (const key of required) {
-  if (!process.env[key]) {
-    console.warn(`[job-ops] Missing ${key}. PostgreSQL routes will fail until env is configured.`);
-  }
+if (useSqliteFallback) {
+  console.log('[JobStrider] Zero-database mode active: Using embedded SQLite at data/jobstrider-server.db');
 }
 
 export const pool = new Pool({
@@ -172,6 +171,9 @@ function prepareNativeQuery(sql, params) {
 }
 
 export async function query(sql, params = []) {
+  if (useSqliteFallback) {
+    return executeSqliteQuery(sql, params);
+  }
   const { text, values } = prepareNativeQuery(sql, params);
   try {
     const res = await pool.query(text, values);
@@ -184,13 +186,47 @@ export async function query(sql, params = []) {
     rows.affectedRows = res.rowCount;
     return rows;
   } catch (err) {
+    if (
+      err.code === 'ECONNREFUSED' ||
+      err.message?.includes('connect ECONNREFUSED') ||
+      err.message?.includes('password authentication failed') ||
+      err.code === '28P01' ||
+      err.code === '3D000'
+    ) {
+      console.warn(`[JobStrider] PostgreSQL unavailable (${err.message}). Activating zero-setup embedded SQLite fallback.`);
+      useSqliteFallback = true;
+      return executeSqliteQuery(sql, params);
+    }
     err.message = `DB query failed: ${err.message}\nSQL: ${text}`;
     throw err;
   }
 }
 
 export async function withTransaction(callback) {
-  const client = await pool.connect();
+  if (useSqliteFallback) {
+    const client = {
+      execute: async (sql, params = []) => {
+        const rows = executeSqliteQuery(sql, params);
+        const meta = {
+          insertId: rows.insertId,
+          rowCount: rows.rowCount,
+          affectedRows: rows.affectedRows
+        };
+        return [rows, meta];
+      }
+    };
+    return callback(client);
+  }
+
+  let client;
+  try {
+    client = await pool.connect();
+  } catch (err) {
+    console.warn(`[JobStrider] PostgreSQL connect failed (${err.message}). Falling back to embedded SQLite transaction.`);
+    useSqliteFallback = true;
+    return withTransaction(callback);
+  }
+
   try {
     await client.query('BEGIN');
 
@@ -219,7 +255,7 @@ export async function withTransaction(callback) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 

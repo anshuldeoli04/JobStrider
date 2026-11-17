@@ -10,6 +10,7 @@ import { validateEvaluation } from '../../../config-utils.mjs';
 import { callLLM } from '../../../llm/llmClient.mjs';
 import { buildDeepEvaluationPrompt } from '../../../llm/evalPrompt.mjs';
 import { safeJsonParse } from '../../../llm/jsonUtils.mjs';
+import { readJobWithAgentReach } from '../../../src/services/deepJobReader.mjs';
 
 const router = express.Router();
 
@@ -77,8 +78,18 @@ router.post('/', async (req, res, next) => {
         `Company: ${body.scanItem?.company}\nRole: ${body.scanItem?.role}\nLocation: ${body.scanItem?.location}\nURL: ${body.selectedScanUrl}`;
     }
 
-    if (!jobDescription && body.url) {
-      jobDescription = `Job URL: ${body.url}\nPlease evaluate based on this linked role context.`;
+    if (!jobDescription && body.url && /^https?:\/\//i.test(body.url)) {
+      try {
+        emitStreamEvent('evaluate', { type: 'log', message: `Fetching job description via Agent Reach from ${body.url}...` }, userId);
+        const deepRead = await readJobWithAgentReach(body.url);
+        if (deepRead.ok && deepRead.content && deepRead.content.length >= 50) {
+          jobDescription = `${deepRead.title ? `Title: ${deepRead.title}\n` : ''}${deepRead.content}`;
+          emitStreamEvent('evaluate', { type: 'log', message: `✔ Successfully retrieved job posting (${jobDescription.length} chars).` }, userId);
+        }
+      } catch {}
+      if (!jobDescription) {
+        jobDescription = `Job URL: ${body.url}\nPlease evaluate based on this linked role context.`;
+      }
       source = 'manual';
     }
 

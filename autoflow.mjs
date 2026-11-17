@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * JOB-OPS AutoFlow v4 (Interactive Human-in-the-Loop Pipeline)
+ * JobStrider AutoFlow v4 (Interactive Human-in-the-Loop Pipeline)
  *
  * One trigger:
  *   1. Scan -> Checkpoint 1 (Review & Confirm AI Eval)
@@ -25,9 +25,31 @@ import {
 } from "./src/services/autoflowDisplay.mjs";
 
 export async function main() {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(`
+JobStrider AutoFlow v4 - Automated Job Search & Application Tailoring
+
+Usage:
+  node autoflow.mjs [options]
+
+Options:
+  --sources=<list>        Comma-separated source boards (greenhouse, lever, ashby, freehire, reach_linkedin, etc.)
+  --keywords=<list>       Comma-separated keyword overrides (e.g. "software engineer, backend")
+  --limit=<number>        Max jobs to evaluate (default: 12)
+  --tailor-top=<number>   Max top jobs to auto-tailor (default: 3)
+  --strong-grades=<list>  Comma-separated list of target grades (default: A,B)
+  --auto-tailor           Automatically generate tailored resumes without interactive prompt
+  --yes, -y               Auto-confirm all confirmation prompts
+  --skip-scan             Skip scanning and evaluate existing unprocessed scan results
+  --non-interactive       Headless execution for cron/CI
+  --help, -h              Display this help message
+`);
+    return { ok: true };
+  }
+
   console.clear();
   logger.info("============================================================");
-  logger.info("                 JOB-OPS AutoFlow v4");
+  logger.info("               JobStrider AutoFlow v4");
   logger.info("       Interactive AI Job Search & Auto-Tailoring");
   logger.info("============================================================\n");
 

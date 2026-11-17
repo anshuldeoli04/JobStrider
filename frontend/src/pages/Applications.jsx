@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Filter, CheckCircle2, Sparkles, Briefcase, Award } from 'lucide-react';
 import Panel from '../components/ui/Panel';
 import DataTable from '../components/ui/DataTable';
 import EmptyState from '../components/ui/EmptyState';
+import InterviewPrepModal from '../components/ui/InterviewPrepModal';
 import { useAppStore } from '../store/useAppStore';
 
 const PAGE_SIZE = 25;
@@ -18,6 +19,15 @@ export default function Applications() {
   const [gradeFilter, setGradeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(1);
+  const [prepApp, setPrepApp] = useState(null);
+
+  const gradeCounts = useMemo(() => {
+    const counts = { ALL: applications.length, A: 0, B: 0, C: 0, D: 0, F: 0 };
+    for (const a of applications) {
+      if (counts[a.grade] !== undefined) counts[a.grade]++;
+    }
+    return counts;
+  }, [applications]);
 
   const rows = useMemo(() => {
     return applications
@@ -26,7 +36,7 @@ export default function Applications() {
         const statusMatch = statusFilter === 'ALL' || item.status === statusFilter;
         const searchMatch =
           !search ||
-          `${item.company} ${item.role}`.toLowerCase().includes(search.toLowerCase());
+          `${item.company || ''} ${item.role || ''} ${item.location || ''}`.toLowerCase().includes(search.toLowerCase());
         return gradeMatch && statusMatch && searchMatch;
       })
       .sort((a, b) => {
@@ -34,7 +44,7 @@ export default function Applications() {
         if (gradeDiff) return gradeDiff;
         const scoreDiff = Number(b.score || 0) - Number(a.score || 0);
         if (scoreDiff) return scoreDiff;
-        return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+        return new Date(b.timestamp || b.evaluated_at || 0).getTime() - new Date(a.timestamp || a.evaluated_at || 0).getTime();
       });
   }, [applications, gradeFilter, search, statusFilter]);
 
@@ -52,23 +62,87 @@ export default function Applications() {
 
   return (
     <Panel
-      title="Applications tracker"
-      subtitle="Filters, row expand, inline status updates, and bulk actions are now scaffolded."
+      title="🎯 Job Applications Pipeline"
+      subtitle={`Tracking ${applications.length} total opportunities • Filtered: ${rows.length}`}
       action={
-        <div className="toolbar-inline">
-          <button className="secondary-button" type="button" onClick={() => bulkUpdateStatus(selectedIds, 'applied')} disabled={!selectedIds.length}>
-            Mark Applied
+        <div className="toolbar-inline" style={{ gap: 8 }}>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => bulkUpdateStatus(selectedIds, 'applied')}
+            disabled={!selectedIds.length}
+            style={{
+              opacity: selectedIds.length ? 1 : 0.5,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <CheckCircle2 size={15} />
+            <span>Mark Applied ({selectedIds.length})</span>
           </button>
         </div>
       }
     >
-      <div className="filter-row">
-        <input className="text-input" placeholder="Search company or role" value={search} onChange={(e) => resetPage(setSearch)(e.target.value)} />
-        <select className="status-select" value={gradeFilter} onChange={(e) => resetPage(setGradeFilter)(e.target.value)}>
-          {['ALL', 'A', 'B', 'C', 'D', 'F'].map((grade) => <option key={grade}>{grade}</option>)}
-        </select>
-        <select className="status-select" value={statusFilter} onChange={(e) => resetPage(setStatusFilter)(e.target.value)}>
-          {['ALL', 'evaluated', 'applied', 'interview', 'offer', 'rejected', 'withdrawn'].map((status) => <option key={status}>{status}</option>)}
+      {/* Interactive Grade Filter Pills */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        {[
+          { id: 'ALL', label: `All Roles (${gradeCounts.ALL})`, color: 'var(--text-soft)' },
+          { id: 'A', label: `✨ Grade A (${gradeCounts.A})`, color: '#10b981' },
+          { id: 'B', label: `Grade B (${gradeCounts.B})`, color: '#6366f1' },
+          { id: 'C', label: `Grade C (${gradeCounts.C})`, color: '#f59e0b' },
+          { id: 'D', label: `Grade D (${gradeCounts.D})`, color: '#f97316' }
+        ].map((pill) => {
+          const isActive = gradeFilter === pill.id;
+          return (
+            <button
+              key={pill.id}
+              type="button"
+              onClick={() => resetPage(setGradeFilter)(pill.id)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 999,
+                fontSize: '0.82rem',
+                fontWeight: isActive ? 600 : 500,
+                border: `1px solid ${isActive ? pill.color : 'var(--border)'}`,
+                background: isActive ? `${pill.color}20` : 'rgba(255, 255, 255, 0.02)',
+                color: isActive ? 'var(--text)' : 'var(--text-soft)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {pill.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search and Status Dropdowns */}
+      <div className="filter-row" style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input
+            className="text-input"
+            placeholder="Search company, role, or city..."
+            value={search}
+            onChange={(e) => resetPage(setSearch)(e.target.value)}
+            style={{ paddingLeft: 40 }}
+          />
+        </div>
+
+        <select
+          className="status-select"
+          value={statusFilter}
+          onChange={(e) => resetPage(setStatusFilter)(e.target.value)}
+          style={{ minWidth: 160 }}
+        >
+          <option value="ALL">All Statuses</option>
+          <option value="evaluated">Evaluated</option>
+          <option value="applied">Applied</option>
+          <option value="interview">Interview</option>
+          <option value="offer">Offer</option>
+          <option value="rejected">Rejected</option>
+          <option value="withdrawn">Withdrawn</option>
         </select>
       </div>
 
@@ -90,44 +164,48 @@ export default function Applications() {
               })
             }
             onStatusChange={updateStatus}
+            onOpenInterviewPrep={(app) => setPrepApp(app)}
           />
+
           <div className="pagination-bar">
             <span>
-              Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, rows.length)} of {rows.length} jobs
+              Showing {pageStart + 1} to {Math.min(pageStart + PAGE_SIZE, rows.length)} of {rows.length} matches
             </span>
             <div className="pagination-controls">
               <button
-                className="icon-button"
                 type="button"
-                onClick={() => {
-                  setPage((value) => Math.max(1, value - 1));
-                  setExpandedId(null);
-                }}
-                disabled={currentPage === 1}
-                title="Previous page"
-                aria-label="Previous page"
+                className="ghost-button"
+                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage <= 1}
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={16} />
               </button>
-              <span>Page {currentPage} of {totalPages}</span>
+              <span>
+                {currentPage} / {totalPages}
+              </span>
               <button
-                className="icon-button"
                 type="button"
-                onClick={() => {
-                  setPage((value) => Math.min(totalPages, value + 1));
-                  setExpandedId(null);
-                }}
-                disabled={currentPage === totalPages}
-                title="Next page"
-                aria-label="Next page"
+                className="ghost-button"
+                onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage >= totalPages}
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={16} />
               </button>
             </div>
           </div>
         </div>
       ) : (
-        <EmptyState title="No matching applications" body="Adjusting your filters or search keywords will display matching applications here." />
+        <EmptyState
+          title="No applications match this filter"
+          body="Try resetting the grade or status filter, or clearing the search text."
+        />
+      )}
+      {prepApp && (
+        <InterviewPrepModal
+          open={Boolean(prepApp)}
+          onClose={() => setPrepApp(null)}
+          application={prepApp}
+        />
       )}
     </Panel>
   );

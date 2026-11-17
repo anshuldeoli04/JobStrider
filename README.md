@@ -1,6 +1,6 @@
-# JOB-OPS
+# JobStrider
 
-> Autonomous, zero-operating-cost AI job pipeline for scanning, evaluating, and tailoring applications for early-career software engineering roles.
+> Autonomous, zero-operating-cost AI job pipeline and control room for scanning, evaluating, and tailoring applications for early-career software engineering roles.
 
 [![CI](https://github.com/anshuldeoli04/JOB-OPS/actions/workflows/ci.yml/badge.svg)](https://github.com/anshuldeoli04/JOB-OPS/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
@@ -13,7 +13,7 @@
 ```mermaid
 flowchart TD
     subgraph S1["1. Multi-Board Discovery"]
-        CLI["💻 CLI Trigger<br/><code>node autoflow.mjs</code>"] --> SCAN["🔍 Scanner Engine<br/><code>scanner.mjs</code>"]
+        CLI["💻 CLI or Web UI<br/><code>jobstrider</code> / Web Dashboard"] --> SCAN["🔍 Scanner Engine<br/><code>scanner.mjs</code>"]
         BOARDS[("🌐 Public Job Boards<br/>Greenhouse • Lever • Ashby • Careers Pages")] --> SCAN
     end
 
@@ -36,7 +36,7 @@ flowchart TD
     subgraph S5["5. PDF Generation & Application Tracking"]
         TAILOR --> PDF["📄 Playwright Engine<br/><code>generate-pdf.mjs</code><br/>Pixel-perfect ATS PDF"]
         PDF --> DATA[("📁 Local JSON Storage<br/><code>data/applications.json</code>")]
-        DATA --> TRACKER["🎯 Interactive Tracker<br/><code>node tracker.mjs</code>"]
+        DATA --> TRACKER["🎯 Interactive Tracker & Web UI<br/>Terminal & React Dashboard"]
     end
 
     classDef primary fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
@@ -54,7 +54,7 @@ flowchart TD
 
 ## 📌 Architecture & Design Principles
 
-JOB-OPS is designed around three strict operational constraints:
+JobStrider is designed around three strict operational constraints:
 1. **Zero Operating Cost**: Built to run entirely on free-tier APIs and local hardware. No subscriptions, hosted proxies, or paid vector databases required.
 2. **Bring Your Own Key (BYOK)**: Your API keys stay on your machine (`.env`). Your CV and job descriptions are sent to the LLM provider you configure (Google Gemini, optionally Groq) for scoring and tailoring. See Disclaimers.
 3. **Autonomous CLI Architecture**:
@@ -110,19 +110,23 @@ node setup-check.mjs
    ```
 3. Update [`cv.md`](./cv.md) with your real technical background, skills, and projects.
 
-### 3. Run the Pipeline
+### 3. Launch & Run
+
+#### Option A: One-Click Web Cockpit (Recommended for All Users)
 ```bash
-# 1. Scan configured job sources
-node scanner.mjs
+npm run ui
+```
+Opens the interactive **JobStrider Dashboard** (`http://localhost:3000`) with zero database installation required (embedded SQLite + JSON synchronization).
 
-# 2. Evaluate discovered jobs with Gemini
-node scan-evaluate.mjs --mode=auto
-
-# 3. View tracked applications
-node tracker.mjs
-
-# 4. Or run the full automated autoflow
+#### Option B: Terminal CLI Mode
+```bash
+# Full automated pipeline (Scan -> Calibrate -> Tailor)
 node autoflow.mjs
+
+# Or individual pipeline stages:
+node scanner.mjs                  # Scan enabled sources
+node scan-evaluate.mjs --mode=auto # Evaluate discovered jobs
+node tracker.mjs                  # Terminal application tracker
 ```
 
 ---
@@ -150,11 +154,16 @@ Scans all enabled sources without modifying existing application records:
 node scanner.mjs
 
 # Scan specific sources with keyword overrides
-node scanner.mjs --sources=ashby,greenhouse --keywords=backend,engineer
+node scanner.mjs --sources=ashby,greenhouse,reach_linkedin,freehire --keywords="software engineer"
 ```
 
+#### Multi-Platform Discovery (Agent Reach & FreeHire)
+JobStrider supports multi-platform retrieval:
+- **FreeHire Remote**: Fast REST scraper for global remote software engineering roles (`--sources=freehire`).
+- **Agent Reach (LinkedIn)**: Headless-free, credential-free LinkedIn job discovery via the Agent Reach CLI (`--sources=reach_linkedin`).
+
 #### Enabling Browser Sources (Naukri, Internshala, Wellfound)
-Official public APIs (Greenhouse, Lever, Ashby) and standard careers pages are enabled by default. Stealth browser-based sources require Playwright Chromium and are opt-in.
+Official public APIs (Greenhouse, Lever, Ashby, FreeHire) and Agent Reach are fast and lightweight. Stealth browser-based sources require Playwright Chromium and are opt-in.
 To enable browser sources:
 1. Ensure Playwright Chromium is installed: `npx playwright install chromium`
 2. In `config.local.json` (or `config.json`), remove them from `disabled_sources`:
@@ -172,10 +181,13 @@ To enable browser sources:
 Paste any job description from LinkedIn, Indeed, or company websites to get an instant candidate fit assessment:
 ```bash
 node evaluate.mjs
+
+# Or evaluate directly from a URL via Agent Reach deep reader:
+node evaluate.mjs --url=https://www.linkedin.com/jobs/view/123456789/
 ```
 Generates fit score (1-10), calibrated letter grade (A+ through F), key strengths, honest skill gaps, and custom interview prep questions.
 
-### 4. Intelligent Resume Tailoring (`resume-builder.mjs`)
+### 4. Intelligent Resume Tailoring & ATS Verifier (`resume-builder.mjs`)
 Generates tailored, high-ATS-yield PDF and HTML resumes aligned directly with target job requirements:
 ```bash
 # Interactive selection from evaluated jobs
@@ -184,9 +196,17 @@ node resume-builder.mjs
 # Directly target a specific tracked application
 node resume-builder.mjs --job-id=<application_id>
 ```
+Post-rendering, the built-in **ATS Verifier** (`atsVerifier.mjs`) parses the binary PDF stream, computes an ATS readability score (0-100 pts), validates contact details, verifies section headings, and flags orphan lines spilling onto page 2.
 
-### 5. Application Tracker (`tracker.mjs`)
-An interactive terminal dashboard for reviewing evaluated jobs and tracking your application lifecycle:
+### 5. Interview Preparation Copilot (`interview-prep.mjs`)
+Generates role-specific interview preparation dossiers grounded in your actual CV experience:
+```bash
+node interview-prep.mjs
+```
+Produces structured STAR behavioral stories, technical Q&A topics, honest skill gap bridges, and strategic questions for the interviewer, saving reports to `reports/interview-prep/`.
+
+### 6. Application Tracker & Outreach Copilot (`tracker.mjs`)
+An interactive terminal dashboard for reviewing evaluated jobs, generating follow-up outreach drafts for stale applications (pending >= 10 days), and tracking your application lifecycle:
 ```bash
 node tracker.mjs
 ```
@@ -195,6 +215,7 @@ node tracker.mjs
 
 ## 🛡️ Security & Privacy Architecture
 
+- **Adversarial Posting Guard**: All incoming job descriptions and scraped postings are sanitized through `postingGuard.mjs` before being passed to LLM prompts, stripping invisible zero-width Unicode characters, hidden HTML comments, script tags, prompt-injection patterns, and cross-script homoglyphs.
 - **Subprocess Environment Sanitization**: Subprocesses launched by the CLI runner inherit a strictly allow-listed environment (`sanitizeChildEnv`). System secrets, database passwords, and master keys are systematically scrubbed before executing child scripts.
 - **Zero Cloud Storage / 100% Local**: All scan results, application histories, tailored resumes, and evaluation reports are stored locally on your machine in atomic JSON and Markdown files under `data/`, `output/`, and `reports/`.
 - **Bring Your Own Key (BYOK)**: All LLM evaluations and resume tailoring run directly against your personal Gemini or Groq API keys with zero telemetry or middleman servers.

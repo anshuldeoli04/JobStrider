@@ -167,7 +167,7 @@ export function parseJobSelection(input, currentPage, pageSize, totalJobs) {
   return [...indices].sort((a, b) => a - b);
 }
 
-export function markEvaluated(job, status = "evaluated", error = null) {
+export function markEvaluated(job, status = "evaluated", error = null, evalResult = null) {
   return withFileLockSync(SCAN_RESULTS_FILE, () => {
     const results = loadScanResults();
     const targetKey = buildScanResultKey(job);
@@ -177,6 +177,13 @@ export function markEvaluated(job, status = "evaluated", error = null) {
         results[idx].status = "evaluated";
         if (job.content) {
           results[idx].content = job.content;
+        }
+        const resObj = evalResult || (job.grade || job.score !== undefined ? job : null);
+        if (resObj) {
+          if (resObj.grade) results[idx].grade = resObj.grade;
+          if (resObj.score !== undefined && resObj.score !== null) results[idx].score = Number(resObj.score);
+          if (resObj.verdict) results[idx].verdict = resObj.verdict;
+          if (resObj.salary_estimate) results[idx].salary_estimate = resObj.salary_estimate;
         }
         delete results[idx].last_error;
       } else if (status === "error" || error) {
@@ -562,7 +569,7 @@ export async function ensureJobContent(job) {
   return null;
 }
 
-async function evaluateJob(job, cvCompact, experienceProfile, config) {
+export async function evaluateJob(job, cvCompact, experienceProfile, config) {
   await ensureJobContent(job);
   const prompt = buildScanEvaluationPrompt(job, cvCompact, experienceProfile);
   const response = await callLLM("score_job", [
@@ -796,7 +803,7 @@ async function main() {
         saved++;
       }
 
-      markEvaluated(job);
+      markEvaluated(job, "evaluated", null, result);
 
       const grade = result.grade;
       const score = Number.isFinite(Number(result.score)) ? Number(result.score).toFixed(1) : result.score;

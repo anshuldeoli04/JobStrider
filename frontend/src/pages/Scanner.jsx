@@ -5,7 +5,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { useAppStore } from '../store/useAppStore';
 import { buildVisibleScanRows, getScanResultLimit, truncateText } from '../utils/scanFormatting';
 
-const sourceOptions = ['greenhouse', 'lever', 'internshala', 'naukri', 'wellfound'];
+const sourceOptions = ['greenhouse', 'lever', 'ashby', 'freehire', 'reach_linkedin', 'foundit', 'indeed', 'internshala', 'naukri', 'wellfound'];
 
 function isSafeUrl(url) {
   if (typeof url !== 'string') return false;

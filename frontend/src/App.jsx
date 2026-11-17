@@ -1,27 +1,15 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import Layout from './components/layout/Layout';
-import AuthLayout from './components/layout/AuthLayout';
+import { useEffect } from 'react';
+import { Sparkles } from 'lucide-react';
+import Sidebar from './components/layout/Sidebar';
+import Header from './components/layout/Header';
+import Cockpit from './pages/Cockpit';
 import ToastViewport from './components/ui/ToastViewport';
 import LoadingBar from './components/ui/LoadingBar';
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Applications = lazy(() => import('./pages/Applications'));
-const Scanner = lazy(() => import('./pages/Scanner'));
-const Evaluate = lazy(() => import('./pages/Evaluate'));
-const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
-const Operations = lazy(() => import('./pages/Operations'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Setup = lazy(() => import('./pages/Setup'));
-import Login from './pages/Login';
-import Signup from './pages/Signup';
 import { useAppStore } from './store/useAppStore';
 
-function ProtectedRoute({ children }) {
+export default function App() {
   const hydrated = useAppStore((state) => state.hydrated);
-  const session = useAppStore((state) => state.session);
   const bootstrap = useAppStore((state) => state.bootstrap);
-  const setupStatus = useAppStore((state) => state.setupStatus);
-  const location = useLocation();
 
   useEffect(() => {
     if (!hydrated) {
@@ -30,62 +18,39 @@ function ProtectedRoute({ children }) {
   }, [bootstrap, hydrated]);
 
   if (!hydrated) {
-    return <div className="page-loader">Loading workspace...</div>;
+    return (
+      <div
+        style={{
+          minBlockSize: '100dvh',
+          display: 'grid',
+          placeItems: 'center',
+          padding: 24
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
+          <div className="brand-mark" style={{ width: 48, height: 48 }}>
+            <Sparkles size={22} />
+          </div>
+          <div style={{ fontSize: '1rem', fontWeight: 700 }}>Opening JobStrider...</div>
+          <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+            Preparing your private workspace
+          </div>
+        </div>
+      </div>
+    );
   }
-
-  if (!session) {
-    return <Navigate to="/auth/login" replace />;
-  }
-
-  if (location.pathname !== '/setup' && setupStatus && !setupStatus.configured) {
-    return <Navigate to="/setup" replace />;
-  }
-
-  return children;
-}
-
-function AppShell() {
-  const location = useLocation();
-  const clearShortcutFocus = useAppStore((state) => state.clearShortcutFocus);
-
-  useEffect(() => {
-    clearShortcutFocus();
-  }, [location.pathname, clearShortcutFocus]);
 
   return (
-    <>
+    <div className="workspace-shell">
       <LoadingBar />
-      <Suspense fallback={<div className="page-loader">Loading page...</div>}>
-        <Routes>
-        <Route element={<AuthLayout />}>
-          <Route path="/auth/login" element={<Login />} />
-          <Route path="/auth/signup" element={<Signup />} />
-        </Route>
-
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="setup" element={<Setup />} />
-          <Route index element={<Dashboard />} />
-          <Route path="applications" element={<Applications />} />
-          <Route path="scanner" element={<Scanner />} />
-          <Route path="evaluate" element={<Evaluate />} />
-          <Route path="resume" element={<ResumeBuilder />} />
-          <Route path="operations" element={<Operations />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-        </Routes>
-      </Suspense>
+      <Sidebar />
+      <div className="workspace-main">
+        <Header />
+        <main className="main-content">
+          <Cockpit />
+        </main>
+      </div>
       <ToastViewport />
-    </>
+    </div>
   );
-}
-
-export default function App() {
-  return <AppShell />;
 }

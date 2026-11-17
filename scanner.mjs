@@ -20,6 +20,8 @@ import { createStealthBrowser } from "./src/scrapers/browser/browserLauncher.mjs
 import { GreenhouseScraper } from "./src/scrapers/greenhouse.mjs";
 import { LeverScraper } from "./src/scrapers/lever.mjs";
 import { AshbyScraper } from "./src/scrapers/ashby.mjs";
+import { FreeHireScraper } from "./src/scrapers/freehire.mjs";
+import { AgentReachScraper, isAgentReachAvailable } from "./src/scrapers/agentReach.mjs";
 import { CareersPageScraper } from "./src/scrapers/browser/careers.mjs";
 import { InternshalaScraper } from "./src/scrapers/browser/internshala.mjs";
 import { NaukriScraper } from "./src/scrapers/browser/naukri.mjs";
@@ -79,6 +81,18 @@ export function resolveActiveSources(config = {}, sourcesArg = "") {
   let sources = allKnownSources.filter((s) => !disabledSources.has(s));
   if (sourcesArg) {
     sources = String(sourcesArg).split(",").map((s) => s.trim()).filter(Boolean);
+  } else {
+    if (Array.isArray(config.enabled_sources)) {
+      if (config.enabled_sources.includes("freehire")) sources.push("freehire");
+      if (config.enabled_sources.includes("reach_linkedin")) sources.push("reach_linkedin");
+      if (config.enabled_sources.includes("foundit")) sources.push("foundit");
+      if (config.enabled_sources.includes("indeed")) sources.push("indeed");
+    }
+    if (config.enable_reach && isAgentReachAvailable()) {
+      if (!sources.includes("reach_linkedin")) sources.push("reach_linkedin");
+      if (!sources.includes("foundit")) sources.push("foundit");
+      if (!sources.includes("indeed")) sources.push("indeed");
+    }
   }
   return sources;
 }
@@ -124,6 +138,18 @@ async function runScrapers(sources, companies, keywords, config, experienceProfi
     if (sources.includes("ashby")) {
       recordSourceBatch("ashby", await new AshbyScraper().scan(companies, keywords, config, experienceProfile));
     }
+    if (sources.includes("freehire")) {
+      recordSourceBatch("freehire", await new FreeHireScraper().scan(keywords, config, experienceProfile));
+    }
+    if (sources.includes("reach_linkedin") || sources.includes("agent_reach") || sources.includes("linkedin")) {
+      recordSourceBatch("reach_linkedin", await new AgentReachScraper("linkedin").scan(keywords, config, experienceProfile));
+    }
+    if (sources.includes("foundit") || sources.includes("reach_foundit")) {
+      recordSourceBatch("foundit", await new AgentReachScraper("foundit").scan(keywords, config, experienceProfile));
+    }
+    if (sources.includes("indeed") || sources.includes("reach_indeed")) {
+      recordSourceBatch("indeed", await new AgentReachScraper("indeed").scan(keywords, config, experienceProfile));
+    }
     if (sources.includes("careers_page")) {
       recordSourceBatch("careers_page", await new CareersPageScraper().scan(sharedBrowser, companies, keywords, config, experienceProfile));
     }
@@ -149,7 +175,7 @@ async function main() {
   console.clear();
   logger.info("============================================================");
   logger.info("        JOB-OPS Scanner");
-  logger.info("  Greenhouse API + Lever API + Ashby API + Internshala + Naukri");
+  logger.info("  Greenhouse API + Lever API + Ashby API + FreeHire + Agent Reach + Naukri");
   logger.info("============================================================\n");
 
   const args = process.argv.slice(2);
@@ -235,7 +261,8 @@ async function main() {
     const evaluate = await askQuestion(`\nDiscovered ${trulyNewJobs.length} new jobs. Evaluate them now? (y/n): `);
     if (evaluate.toLowerCase() === "y") {
       const { spawn } = await import("child_process");
-      spawn("node", ["scan-evaluate.mjs"], { stdio: "inherit" });
+      const scanEvaluateScript = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "scan-evaluate.mjs");
+      spawn(process.execPath, [scanEvaluateScript], { stdio: "inherit" });
     }
   }
 }

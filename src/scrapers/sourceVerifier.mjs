@@ -27,7 +27,7 @@ async function safeFetchJson(url, maxRedirects = 5) {
 
 export async function verifySources(companies) {
   logger.info("\n" + "=".repeat(115));
-  logger.info("           JOB-OPS ATS SOURCE & SLUG VERIFICATION");
+  logger.info("          JobStrider ATS SOURCE & SLUG VERIFICATION");
   logger.info("=".repeat(115) + "\n");
 
   const results = [];

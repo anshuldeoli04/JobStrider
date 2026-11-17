@@ -1,12 +1,12 @@
 /**
- * JOB-OPS Setup Checker
+ * JobStrider Setup Checker
  * Checks all prerequisites and config
  */
 
 import fs from "fs";
 import { getConfigPaths, isPlaceholderCv, loadConfig } from "./config-utils.mjs";
 
-console.log("\n🔍 JOB-OPS Setup Check\n");
+console.log("\n🔍 JobStrider Setup Check\n");
 
 let allGood = true;
 function check(name, condition, fix, { optional = false } = {}) {

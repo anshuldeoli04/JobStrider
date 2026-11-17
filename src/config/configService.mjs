@@ -1,9 +1,17 @@
 import fs from "fs";
 import path from "path";
-import { REPO_ROOT, CV_FILE, PLACEHOLDER_API_KEY } from "./configPaths.mjs";
+import {
+  REPO_ROOT,
+  CV_FILE,
+  CONFIG_LOCAL_FILE,
+  ENV_FILE,
+  PLACEHOLDER_API_KEY,
+} from "./configPaths.mjs";
 import { withFileLockSync, syncSleep, loadJsonFile } from "../utils/fileLock.mjs";
 
-const ENV_FILES = [path.resolve(REPO_ROOT, ".env.local"), path.resolve(REPO_ROOT, ".env")];
+const ENV_FILES = process.env.JOBSTRIDER_ISOLATED === "1"
+  ? [ENV_FILE]
+  : [path.resolve(REPO_ROOT, ".env.local"), ENV_FILE];
 const PLACEHOLDER_RE = /\[\[[^\]\n]{2,80}\]\]/;
 
 export function loadEnvFiles() {
@@ -25,7 +33,7 @@ export function loadEnvFiles() {
 
 loadEnvFiles();
 
-export function saveEnvUpdates(updates = {}, filePath = path.resolve(REPO_ROOT, ".env")) {
+export function saveEnvUpdates(updates = {}, filePath = ENV_FILE) {
   withFileLockSync(filePath, () => {
     let existingLines = [];
     if (fs.existsSync(filePath)) {
@@ -87,9 +95,9 @@ export function isPlaceholderCv(content) {
 
 export function loadConfig({ requireApiKey = true } = {}) {
   const baseConfig = loadJsonFile(path.resolve(REPO_ROOT, "config.json"), { fallback: null });
-  const localConfig = loadJsonFile(path.resolve(REPO_ROOT, "config.local.json"), { fallback: null });
+  const localConfig = loadJsonFile(CONFIG_LOCAL_FILE, { fallback: null });
   if (!baseConfig && !localConfig) {
-    throw new Error("Config file missing. Run `npm run setup` to configure JOB-OPS.");
+    throw new Error("Config file missing. Run `npm run setup` to configure JobStrider.");
   }
 
   const jsonConfig = { ...(baseConfig || {}), ...(localConfig || {}) };

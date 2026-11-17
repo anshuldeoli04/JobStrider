@@ -6,14 +6,6 @@ const gradeOrder = { A: 5, B: 4, C: 3, D: 2, F: 1 };
 const parseError = (error, fallback) =>
   error?.response?.data?.error || error?.message || fallback;
 
-const appendTaskLog = (task, message, nextStatus) => (state) => ({
-  [task]: {
-    ...state[task],
-    status: nextStatus || state[task].status,
-    logs: message ? [...(state[task].logs || []), message] : state[task].logs || []
-  }
-});
-
 function createLogBatcher(flushCallback, intervalMs = 150) {
   let buffer = [];
   let timer = null;
@@ -40,9 +32,11 @@ function createLogBatcher(flushCallback, intervalMs = 150) {
   return { push, flush };
 }
 
+let activeScanEventSource = null;
+
 export const useAppStore = create((set, get) => ({
   hydrated: false,
-  shortcutFocus: null,
+  currentView: 'home', // 'home' | 'discover' | 'check' | 'applications' | 'resumes' | 'settings'
   backgroundTask: null,
   session: null,
   applications: [],
@@ -50,30 +44,46 @@ export const useAppStore = create((set, get) => ({
   config: null,
   setupStatus: null,
   usage: null,
-  ops: null,
-  autoApplyPreview: null,
   activity: [],
   notifications: [],
-  activeScan: { status: 'idle', logs: [] },
+  activeScan: { status: 'idle', phase: 'idle', logs: [], message: '' },
   activeEvaluation: { status: 'idle', result: null, logs: [] },
   activeResume: { status: 'idle', result: null, logs: [] },
+  tailoringId: null,
+  isByokModalOpen: false,
+  isResumeModalOpen: false,
+  selectedJob: null,
+  previewResume: null, // { title, htmlUrl, pdfUrl }
+
+  setCurrentView: (view) => set({ currentView: view }),
+  openByokModal: () => set({ isByokModalOpen: true }),
+  closeByokModal: () => set({ isByokModalOpen: false }),
+  openResumeModal: () => set({ isResumeModalOpen: true }),
+  closeResumeModal: () => set({ isResumeModalOpen: false }),
+  openJobDetail: (job) => set({ selectedJob: job }),
+  closeJobDetail: () => set({ selectedJob: null }),
+  openResumePreview: (preview) => set({ previewResume: preview }),
+  closeResumePreview: () => set({ previewResume: null }),
 
   bootstrap: async () => {
     try {
-      const token = localStorage.getItem('job_ops_token');
+      let token = localStorage.getItem('job_ops_token');
       if (!token) {
-        set({ session: null, hydrated: true });
-        return;
+        try {
+          const localAuth = await api.loginLocal();
+          token = localAuth.token;
+        } catch {
+          token = 'jobstrider-local-operator-token';
+          localStorage.setItem('job_ops_token', token);
+        }
       }
       const [sessionRes, applications, scanResults, config, activity] = await api.bootstrap();
-      const [setupStatus, usage] = sessionRes?.user
-        ? await Promise.all([
-            api.getSetupStatus().catch(() => null),
-            api.getUsage().catch(() => null)
-          ])
-        : [null, null];
+      const [setupStatus, usage] = await Promise.all([
+        api.getSetupStatus().catch(() => null),
+        api.getUsage().catch(() => null)
+      ]);
       set({
-        session: sessionRes?.user || null,
+        session: sessionRes?.user || { id: 1, name: 'Job Seeker', email: 'local@jobstrider.app' },
         applications: applications || [],
         scanResults: scanResults || [],
         config: config || null,
@@ -83,11 +93,14 @@ export const useAppStore = create((set, get) => ({
         hydrated: true
       });
     } catch (error) {
-      set({ hydrated: true });
+      set({
+        session: { id: 1, name: 'Job Seeker', email: 'local@jobstrider.app' },
+        hydrated: true
+      });
       get().pushToast({
         type: 'error',
-        title: 'Bootstrap failed',
-        message: parseError(error, 'Server se initial data load nahi hua.')
+        title: 'Connection notice',
+        message: parseError(error, 'Could not connect to the local backend server.')
       });
     }
   },
@@ -96,7 +109,7 @@ export const useAppStore = create((set, get) => ({
     set((state) => ({
       notifications: [
         ...state.notifications,
-        { id: crypto.randomUUID(), duration: 4000, ...toast }
+        { id: crypto.randomUUID(), duration: 4200, ...toast }
       ]
     })),
 
@@ -108,103 +121,89 @@ export const useAppStore = create((set, get) => ({
   startTask: (label) => set({ backgroundTask: { label, startedAt: Date.now() } }),
   endTask: () => set({ backgroundTask: null }),
 
-  login: async (payload) => {
-    get().startTask('Signing you in...');
-    try {
-      const data = await api.login(payload);
-      set({ session: data.user });
-      await get().bootstrap();
-      get().pushToast({ type: 'success', title: 'Welcome back', message: `${data.user.name} signed in.` });
-      return data;
-    } finally {
-      get().endTask();
-    }
-  },
-
-  signup: async (payload) => {
-    get().startTask('Creating your workspace...');
-    try {
-      const data = await api.signup(payload);
-      set({
-        session: data.user,
-        config: {
-          ...get().config,
-          name: data.user.name,
-          experience_level: data.user.experienceLevel,
-          experience_years: data.user.experienceYears,
-          cv_content: payload.cvContent || ''
-        }
-      });
-      await get().bootstrap();
-      get().pushToast({ type: 'success', title: 'Account created', message: 'Profile setup ready hai.' });
-      return data;
-    } finally {
-      get().endTask();
-    }
-  },
-
-  logout: async () => {
-    await api.logout();
-    set({
-      session: null,
-      setupStatus: null,
-      usage: null,
-      config: null,
-      ops: null,
-      autoApplyPreview: null,
-      applications: [],
-      scanResults: [],
-      activity: [],
-      notifications: [],
-      activeScan: { status: 'idle', logs: [] },
-      activeEvaluation: { status: 'idle', result: null, logs: [] },
-      activeResume: { status: 'idle', result: null, logs: [] }
-    });
-  },
-
-  setShortcutFocus: (value) => set({ shortcutFocus: value }),
-  clearShortcutFocus: () => set({ shortcutFocus: null }),
-
   updateStatus: async (id, status) => {
     const previous = get().applications;
+    const nextApps = previous.map((item) => (item.id === id ? { ...item, status } : item));
+    const currentSelected = get().selectedJob;
     set({
-      applications: previous.map((item) => (item.id === id ? { ...item, status } : item))
+      applications: nextApps,
+      selectedJob: currentSelected?.id === id ? { ...currentSelected, status } : currentSelected
     });
 
     try {
-      await api.updateApplicationStatus(id, { status });
-      get().pushToast({ type: 'success', title: 'Status updated', message: `Application ${status} mark ho gayi.` });
+      const updated = await api.updateApplicationStatus(id, { status });
+      set((state) => ({
+        applications: state.applications.map((item) => (item.id === id ? { ...item, ...updated } : item))
+      }));
+      get().pushToast({
+        type: 'success',
+        title: 'Status updated',
+        message: `Moved to "${status}".`
+      });
     } catch (error) {
-      set({ applications: previous });
-      get().pushToast({ type: 'error', title: 'Status failed', message: parseError(error, 'Update rollback kar diya.') });
+      set({ applications: previous, selectedJob: currentSelected });
+      get().pushToast({
+        type: 'error',
+        title: 'Could not update status',
+        message: parseError(error, 'Update failed; previous status restored.')
+      });
     }
   },
 
   bulkUpdateStatus: async (ids, status) => {
+    if (!Array.isArray(ids) || !ids.length) return;
     const previous = get().applications;
     set({
       applications: previous.map((item) => (ids.includes(item.id) ? { ...item, status } : item))
     });
     try {
       const data = await api.updateApplicationsBulk({ ids, status });
-      set({ applications: data.applications });
-      get().pushToast({ type: 'success', title: 'Bulk update done', message: `${ids.length} rows sync ho gayi.` });
+      set({ applications: data.applications || previous });
+      get().pushToast({
+        type: 'success',
+        title: 'Applications updated',
+        message: `${ids.length} job(s) marked as "${status}".`
+      });
     } catch (error) {
       set({ applications: previous });
-      get().pushToast({ type: 'error', title: 'Bulk update failed', message: parseError(error, 'Rows restore kar di gayi.') });
+      get().pushToast({
+        type: 'error',
+        title: 'Bulk update failed',
+        message: parseError(error, 'Could not update selected jobs.')
+      });
+    }
+  },
+
+  deleteApplication: async (id) => {
+    const previous = get().applications;
+    set((state) => ({
+      applications: previous.filter((item) => item.id !== id),
+      selectedJob: state.selectedJob?.id === id ? null : state.selectedJob
+    }));
+    try {
+      const data = await api.deleteApplication(id);
+      set({ applications: data.applications || [] });
+      get().pushToast({ type: 'info', title: 'Job removed', message: 'Removed from your tracker.' });
+    } catch (error) {
+      set({ applications: previous });
+      get().pushToast({ type: 'error', title: 'Delete failed', message: parseError(error, 'Could not remove item.') });
     }
   },
 
   saveConfig: async (payload) => {
-    get().startTask('Saving settings...');
+    get().startTask('Saving preferences...');
     try {
       const data = await api.saveConfig(payload);
       const [setupStatus, usage] = await Promise.all([
         api.getSetupStatus().catch(() => get().setupStatus),
         api.getUsage().catch(() => get().usage)
       ]);
-      set({ config: data.config, setupStatus, usage });
-      get().pushToast({ type: 'success', title: 'Settings saved', message: 'Profile, Gemini key, aur CV text save ho gaye.' });
+      set({ config: data.config || get().config, setupStatus, usage });
+      get().pushToast({
+        type: 'success',
+        title: 'Saved',
+        message: 'Your preferences and profile are updated.'
+      });
       return data;
     } finally {
       get().endTask();
@@ -212,7 +211,7 @@ export const useAppStore = create((set, get) => ({
   },
 
   testApiKey: async (payload) => {
-    get().startTask('Testing Gemini key...');
+    get().startTask('Testing AI key...');
     try {
       return await api.testApiKey(payload);
     } finally {
@@ -221,15 +220,19 @@ export const useAppStore = create((set, get) => ({
   },
 
   updateApiKey: async (payload) => {
-    get().startTask('Updating Gemini key...');
+    get().startTask('Connecting AI key...');
     try {
       const data = await api.updateApiKey(payload);
       const [setupStatus, usage] = await Promise.all([
         api.getSetupStatus().catch(() => get().setupStatus),
         api.getUsage().catch(() => get().usage)
       ]);
-      set({ config: data.config, setupStatus, usage });
-      get().pushToast({ type: 'success', title: 'API key updated', message: 'Gemini key verify karke safely save ho gayi.' });
+      set({ config: data.config || get().config, setupStatus, usage });
+      get().pushToast({
+        type: 'success',
+        title: 'Google AI connected',
+        message: 'Your free Gemini key is active and ready.'
+      });
       return data;
     } finally {
       get().endTask();
@@ -237,16 +240,19 @@ export const useAppStore = create((set, get) => ({
   },
 
   uploadCvPdf: async (file) => {
-    get().startTask('Parsing resume PDF...');
+    get().startTask('Reading your PDF resume...');
     try {
       const data = await api.uploadCvPdf(file);
+      const setupStatus = await api.getSetupStatus().catch(() => get().setupStatus);
       set((state) => ({
-        config: {
-          ...state.config,
-          cv_content: data.cv_content
-        }
+        config: data.config || { ...state.config, cv_content: data.cv_content, has_cv: true },
+        setupStatus
       }));
-      get().pushToast({ type: 'success', title: 'PDF parsed', message: 'CV text extract ho gaya. Save kar do to DB me persist ho jayega.' });
+      get().pushToast({
+        type: 'success',
+        title: 'Resume uploaded',
+        message: 'Extracted text from your PDF resume cleanly.'
+      });
       return data;
     } finally {
       get().endTask();
@@ -254,9 +260,13 @@ export const useAppStore = create((set, get) => ({
   },
 
   runScan: async (payload) => {
-    get().startTask('Scanning job sources...');
+    if (activeScanEventSource) {
+      activeScanEventSource.close();
+      activeScanEventSource = null;
+    }
+
+    get().startTask(payload?.mode === 'autoflow' ? 'Finding and scoring jobs...' : 'Searching job boards...');
     const streamUrl = await api.getStreamUrl('/scan/stream');
-    let eventSource = null;
     const logBatcher = createLogBatcher((newLines) => {
       set((state) => ({
         activeScan: {
@@ -269,68 +279,91 @@ export const useAppStore = create((set, get) => ({
     set({
       activeScan: {
         status: 'running',
-        logs: ['Preparing scan workspace...', 'Connecting to bridge server...', 'Dispatching scan sources...']
+        phase: 'scanning',
+        logs: ['Connecting to job boards...'],
+        message: ''
       }
     });
+
     try {
-      eventSource = new EventSource(streamUrl);
-      eventSource.onmessage = (event) => {
+      const es = new EventSource(streamUrl);
+      activeScanEventSource = es;
+
+      es.onmessage = (event) => {
         try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'log' && payload.message) {
-            logBatcher.push(payload.message);
-          }
-          if (payload.type === 'error') {
-            logBatcher.flush();
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'phase' && msg.phase) {
             set((state) => ({
+              activeScan: { ...state.activeScan, phase: msg.phase }
+            }));
+          }
+          if (msg.type === 'log' && msg.message) {
+            logBatcher.push(msg.message);
+          }
+          if (msg.type === 'complete') {
+            logBatcher.flush();
+            const isOk = msg.status === 'success';
+            set((state) => ({
+              scanResults: msg.scanResults || state.scanResults,
+              applications: msg.applications || state.applications,
+              activity: msg.activity || state.activity,
               activeScan: {
                 ...state.activeScan,
-                status: 'error',
-                logs: [...state.activeScan.logs, payload.message || 'Scan stream failed.']
+                status: isOk ? 'success' : 'error',
+                phase: isOk ? 'done' : 'error',
+                message: msg.message || ''
               }
             }));
+            get().endTask();
+            get().pushToast({
+              type: isOk ? 'success' : 'warning',
+              title: isOk ? 'Job search finished' : 'Search completed with notes',
+              message: msg.message || 'Check your discovered jobs list.'
+            });
+            es.close();
+            if (activeScanEventSource === es) activeScanEventSource = null;
           }
         } catch {}
       };
 
-      const data = await api.runScan(payload);
-      logBatcher.flush();
-      set((state) => ({
-        scanResults: data.scanResults || state.scanResults,
-        activeScan: {
-          status: 'success',
-          logs: data.logs?.length
-            ? data.logs
-            : [
-                ...state.activeScan.logs,
-                'Scan request accepted.',
-                data.message || 'Scanner completed.'
-              ]
-        }
-      }));
-      const activity = await api.bootstrap().then((result) => result[4]).catch(() => null);
-      set((state) => ({
-        activity: activity || state.activity,
-        activeScan: {
-          ...state.activeScan
-        }
-      }));
-      get().pushToast({ type: 'success', title: 'Scanner complete', message: data.message || 'Matching jobs sync ho gaye.' });
+      es.onerror = () => {
+        logBatcher.flush();
+        get().endTask();
+        es.close();
+        if (activeScanEventSource === es) activeScanEventSource = null;
+      };
+
+      await api.runScan(payload);
     } catch (error) {
       logBatcher.flush();
-      set({
-        activeScan: { status: 'error', logs: ['Scan request failed.', parseError(error, 'Scanner run nahi hua.')] }
-      });
-      get().pushToast({ type: 'error', title: 'Scanner error', message: parseError(error, 'Scan run nahi hua.') });
-    } finally {
-      logBatcher.flush();
-      eventSource?.close();
+      activeScanEventSource?.close();
+      activeScanEventSource = null;
       get().endTask();
+      const errMsg = parseError(error, 'Could not start the job search.');
+      set({
+        activeScan: { status: 'error', phase: 'error', logs: [errMsg], message: errMsg }
+      });
+      get().pushToast({ type: 'error', title: 'Could not start search', message: errMsg });
+    }
+  },
+
+  stopScan: async () => {
+    try {
+      await api.stopScan();
+    } finally {
+      activeScanEventSource?.close();
+      activeScanEventSource = null;
+      get().endTask();
+      set((state) => ({
+        activeScan: { ...state.activeScan, status: 'idle', phase: 'cancelled' }
+      }));
+      get().pushToast({ type: 'info', title: 'Search stopped', message: 'Job search was cancelled.' });
     }
   },
 
   runEvaluate: async (payload) => {
-    get().startTask('Evaluating job with Gemini...');
+    const isBatch = payload?.mode === 'scanned';
+    get().startTask(isBatch ? 'Scoring discovered jobs with AI...' : 'Checking your fit for this job...');
     const streamUrl = await api.getStreamUrl('/evaluate/stream');
     let eventSource = null;
     const logBatcher = createLogBatcher((newLines) => {
@@ -346,39 +379,27 @@ export const useAppStore = create((set, get) => ({
       activeEvaluation: {
         status: 'running',
         result: null,
-        logs: ['Preparing evaluate request...', 'Connecting to evaluation stream...']
+        logs: [isBatch ? 'Scoring top discovered openings...' : 'Reading job description and comparing with your resume...']
       }
     });
+
     try {
       eventSource = new EventSource(streamUrl);
       eventSource.onmessage = (event) => {
         try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'log' && payload.message) {
-            logBatcher.push(payload.message);
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'log' && msg.message) {
+            logBatcher.push(msg.message);
           }
-          if (payload.type === 'status' && payload.status) {
-            logBatcher.flush();
-            set((state) => ({
-              activeEvaluation: {
-                ...state.activeEvaluation,
-                status: payload.status
-              }
-            }));
-          }
-          if (payload.type === 'complete' && payload.result) {
+          if (msg.type === 'complete' && msg.result) {
             logBatcher.flush();
             set((state) => ({
               activeEvaluation: {
                 ...state.activeEvaluation,
                 status: 'success',
-                result: payload.result
+                result: msg.result
               }
             }));
-          }
-          if (payload.type === 'error') {
-            logBatcher.flush();
-            set(appendTaskLog('activeEvaluation', payload.message || 'Evaluation stream failed.', 'error'));
           }
         } catch {}
       };
@@ -386,32 +407,61 @@ export const useAppStore = create((set, get) => ({
       const data = await api.runEvaluate(payload);
       logBatcher.flush();
       const usage = await api.getUsage().catch(() => get().usage);
-      set((state) => ({
-        activeEvaluation: {
-          status: 'success',
-          result: data.result,
-          logs: data.result
-            ? [...state.activeEvaluation.logs, 'Evaluation result received.']
-            : state.activeEvaluation.logs
-        },
-        usage,
-        applications: data.result
-          ? [data.result, ...state.applications.filter((item) => item.id !== data.result.id)].sort(
-              (a, b) => (gradeOrder[b.grade] || 0) - (gradeOrder[a.grade] || 0)
-            )
-          : state.applications
-      }));
-      get().pushToast({ type: 'success', title: 'Evaluation ready', message: 'Result panel update ho gaya.' });
+
+      if (isBatch) {
+        set((state) => ({
+          activeEvaluation: {
+            status: 'success',
+            result: null,
+            logs: [...state.activeEvaluation.logs, data.message || 'Finished scoring discovered jobs.']
+          },
+          applications: data.applications || state.applications,
+          scanResults: data.scanResults || state.scanResults,
+          activity: data.activity || state.activity,
+          usage
+        }));
+        get().pushToast({
+          type: 'success',
+          title: 'Scoring complete',
+          message: data.message || 'Strong matches have been added to My Applications.'
+        });
+      } else {
+        set((state) => ({
+          activeEvaluation: {
+            status: 'success',
+            result: data.result,
+            logs: [...state.activeEvaluation.logs, 'Fit analysis ready!']
+          },
+          scanResults: data.scanResults || state.scanResults,
+          applications: data.applications
+            ? data.applications
+            : data.result
+              ? [data.result, ...state.applications.filter((item) => item.id !== data.result.id)].sort(
+                  (a, b) => (gradeOrder[b.grade] || 0) - (gradeOrder[a.grade] || 0)
+                )
+              : state.applications,
+          activity: data.activity || state.activity,
+          usage
+        }));
+        get().pushToast({
+          type: 'success',
+          title: 'Fit report ready',
+          message: `${data.result?.company || 'Job'} scored ${Number(data.result?.score || 0).toFixed(1)}/10 (Grade ${data.result?.grade || '?'}).`
+        });
+      }
+      return data;
     } catch (error) {
       logBatcher.flush();
+      const errMsg = parseError(error, 'Could not evaluate this job.');
       set((state) => ({
         activeEvaluation: {
           status: 'error',
           result: null,
-          logs: [...state.activeEvaluation.logs, parseError(error, 'Evaluate endpoint respond nahi kar paaya.')]
+          logs: [...state.activeEvaluation.logs, errMsg]
         }
       }));
-      get().pushToast({ type: 'error', title: 'Evaluation failed', message: parseError(error, 'Evaluate endpoint respond nahi kar paaya.') });
+      get().pushToast({ type: 'error', title: 'Check failed', message: errMsg });
+      throw error;
     } finally {
       logBatcher.flush();
       eventSource?.close();
@@ -420,7 +470,9 @@ export const useAppStore = create((set, get) => ({
   },
 
   runResume: async (payload) => {
-    get().startTask('Generating tailored resume...');
+    const targetId = payload?.applicationId || payload?.jobId || null;
+    set({ tailoringId: targetId || 'custom' });
+    get().startTask('Creating your tailored resume...');
     const streamUrl = await api.getStreamUrl('/resume/stream');
     let eventSource = null;
     const logBatcher = createLogBatcher((newLines) => {
@@ -436,100 +488,88 @@ export const useAppStore = create((set, get) => ({
       activeResume: {
         status: 'running',
         result: null,
-        logs: ['Preparing resume generation...', 'Connecting to resume stream...']
+        logs: ['Highlighting your strongest matching skills for this job...']
       }
     });
+
     try {
       eventSource = new EventSource(streamUrl);
       eventSource.onmessage = (event) => {
         try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'log' && payload.message) {
-            logBatcher.push(payload.message);
-          }
-          if (payload.type === 'status' && payload.status) {
-            logBatcher.flush();
-            set((state) => ({
-              activeResume: {
-                ...state.activeResume,
-                status: payload.status
-              }
-            }));
-          }
-          if (payload.type === 'complete' && payload.result) {
-            logBatcher.flush();
-            set((state) => ({
-              activeResume: {
-                ...state.activeResume,
-                status: 'success',
-                result: payload.result
-              }
-            }));
-          }
-          if (payload.type === 'error') {
-            logBatcher.flush();
-            set(appendTaskLog('activeResume', payload.message || 'Resume stream failed.', 'error'));
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'log' && msg.message) {
+            logBatcher.push(msg.message);
           }
         } catch {}
       };
 
       const data = await api.runResume(payload);
       logBatcher.flush();
-      const applications = await api.getApplications();
       const usage = await api.getUsage().catch(() => get().usage);
-      set({
-        activeResume: { status: 'success', result: data, logs: data.logs || [] },
-        applications,
+      const nextApps = data.applications || (await api.getApplications());
+      const currentSelected = get().selectedJob;
+      const updatedSelected = currentSelected
+        ? nextApps.find((a) => a.id === currentSelected.id) || currentSelected
+        : null;
+      const currentEvalResult = get().activeEvaluation.result;
+      const updatedEvalResult = currentEvalResult
+        ? nextApps.find((a) => a.id === currentEvalResult.id) || currentEvalResult
+        : null;
+
+      set((state) => ({
+        activeResume: { status: 'success', result: data, logs: data.logs || state.activeResume.logs },
+        applications: nextApps,
+        selectedJob: updatedSelected,
+        activeEvaluation: { ...state.activeEvaluation, result: updatedEvalResult },
         usage
+      }));
+      get().pushToast({
+        type: 'success',
+        title: 'Tailored resume ready',
+        message: data.message || 'Your customized resume is ready to preview and download.'
       });
-      get().pushToast({ type: 'success', title: 'Resume ready', message: data.message || 'Resume output linked ho gaya.' });
+      return data;
     } catch (error) {
       logBatcher.flush();
+      const errMsg = parseError(error, 'Could not build tailored resume.');
       set((state) => ({
         activeResume: {
           status: 'error',
           result: null,
-          logs: [...state.activeResume.logs, parseError(error, 'Resume builder call fail ho gayi.')]
+          logs: [...state.activeResume.logs, errMsg]
         }
       }));
-      get().pushToast({ type: 'error', title: 'Resume failed', message: parseError(error, 'Resume builder call fail ho gayi.') });
+      get().pushToast({ type: 'error', title: 'Resume failed', message: errMsg });
+      throw error;
     } finally {
       logBatcher.flush();
       eventSource?.close();
+      set({ tailoringId: null });
       get().endTask();
     }
   },
 
-  loadOps: async () => {
-    const data = await api.getOps();
-    set({ ops: data });
-    return data;
-  },
-
-  saveOpsSettings: async (payload) => {
-    get().startTask('Saving operations settings...');
+  resetWorkspace: async (options = {}) => {
+    get().startTask('Clearing workspace...');
     try {
-      const data = await api.saveOpsSettings(payload);
-      set((state) => ({ ops: { ...(state.ops || {}), settings: data.settings } }));
-      get().pushToast({ type: 'success', title: 'Operations saved', message: 'Roadmap controls sync ho gaye.' });
-      return data;
-    } finally {
-      get().endTask();
-    }
-  },
-
-  refreshOpsHealth: async () => {
-    const data = await api.getOpsHealth();
-    set((state) => ({ ops: { ...(state.ops || {}), ...data } }));
-    return data;
-  },
-
-  previewAutoApply: async (payload) => {
-    get().startTask('Preparing safe auto-apply preview...');
-    try {
-      const data = await api.previewAutoApply(payload);
-      set({ autoApplyPreview: data });
-      get().pushToast({ type: 'success', title: 'Preview ready', message: `${data.candidates?.length || 0} applications checked.` });
+      const data = await api.resetWorkspace(options);
+      const setupStatus = await api.getSetupStatus().catch(() => null);
+      set({
+        applications: data.applications || [],
+        scanResults: data.scanResults || [],
+        activity: data.activity || [],
+        config: data.config || get().config,
+        setupStatus,
+        selectedJob: null,
+        activeEvaluation: { status: 'idle', result: null, logs: [] },
+        activeResume: { status: 'idle', result: null, logs: [] },
+        activeScan: { status: 'idle', phase: 'idle', logs: [], message: '' }
+      });
+      get().pushToast({
+        type: 'success',
+        title: 'Workspace cleared',
+        message: 'Started fresh with zero saved jobs.'
+      });
       return data;
     } finally {
       get().endTask();

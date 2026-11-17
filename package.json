@@ -1,11 +1,12 @@
 {
-  "name": "job-ops",
+  "name": "jobstrider",
   "version": "4.0.0",
   "private": true,
   "type": "module",
   "description": "Autonomous AI job pipeline for scanning, evaluating, and tailoring applications for early-career software roles.",
   "license": "MIT",
   "bin": {
+    "jobstrider": "./autoflow.mjs",
     "job-ops": "./autoflow.mjs"
   },
   "files": [
@@ -21,6 +22,9 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "start": "node scripts/start-ui.mjs",
+    "ui": "node scripts/start-ui.mjs",
+    "ui:build": "npm --prefix frontend run build",
     "install:browsers": "npx playwright install chromium",
     "test": "node test/runner.mjs",
     "smoke": "node test/smoke.test.mjs",
@@ -32,6 +36,7 @@
     "resume": "node resume-builder.mjs",
     "setup": "node setup-wizard.mjs",
     "setup-check": "node setup-check.mjs",
+    "interview": "node interview-prep.mjs",
     "autoflow": "node autoflow.mjs"
   },
   "dependencies": {

@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Setup Wizard
+ * JobStrider Setup Wizard
  * Interactive CLI Onboarding & Configuration Wizard (Phase 1)
  *
  * Usage:
@@ -159,7 +159,7 @@ Email: [[YOUR EMAIL]] | Phone: [[YOUR PHONE]] | Location: [[YOUR CITY]]
 
 export async function runSetupWizard({ interactive = true, checkOnly = false } = {}) {
   console.log("\n============================================================");
-  console.log("          JOB-OPS Guided Setup & Configuration Wizard       ");
+  console.log("          JobStrider Guided Setup & Configuration Wizard    ");
   console.log("============================================================\n");
 
   const existingEnv = parseEnvFile();

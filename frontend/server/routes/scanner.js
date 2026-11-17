@@ -10,7 +10,7 @@ import { emitScannerEvent, subscribeScannerStream } from '../utils/sseHub.js';
 import { withWorkspaceLock } from '../utils/workspaceLock.js';
 
 const router = express.Router();
-const allowedSources = new Set(['greenhouse', 'lever', 'internshala', 'naukri', 'wellfound']);
+const allowedSources = new Set(['greenhouse', 'lever', 'ashby', 'careers_page', 'freehire', 'reach_linkedin', 'foundit', 'indeed', 'internshala', 'naukri', 'wellfound']);
 
 function getScanStreamFile(userId) {
   const safeId = String(userId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');

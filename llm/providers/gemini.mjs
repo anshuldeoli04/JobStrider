@@ -3,6 +3,11 @@ import { getRetryAfterMs, trackGeminiCall } from "../../config-utils.mjs";
 import { getActiveGeminiKey } from "../keyManager.mjs";
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_FALLBACK_MODELS = Object.freeze([
+  "gemini-flash-lite-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-3.5-flash"
+]);
 
 const _clientCache = new Map();
 export function getGenAIClient(apiKey) {
@@ -169,67 +174,92 @@ export async function callGemini(messages, options = {}) {
     throw new Error("Gemini API key missing. Set GEMINI_API_KEY in .env.");
   }
 
-  const modelName = options.model || options.config?.gemini_model || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const requestedModel =
+    options.model || options.config?.gemini_model || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   const genAI = getGenAIClient(apiKey);
 
   const responseMimeType =
     options.responseMimeType ||
     (options.responseFormat?.type === "json_object" ? "application/json" : undefined);
 
-  // Default to zero thinking tokens for fast, deterministic JSON responses
-  const thinkingConfig =
-    options.thinkingBudget !== undefined
-      ? { thinkingBudget: options.thinkingBudget }
-      : { thinkingBudget: 0 };
-
   const systemMessage = Array.isArray(messages) ? messages.find((m) => m?.role === "system") : null;
   const nonSystemMessages = Array.isArray(messages) ? messages.filter((m) => m?.role !== "system") : messages;
   const systemInstruction = options.systemInstruction || systemMessage?.content || undefined;
 
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    ...(systemInstruction ? { systemInstruction } : {}),
-    generationConfig: {
-      temperature: options.temperature ?? 0.1,
-      maxOutputTokens: options.max_tokens || options.maxOutputTokens || 1024,
-      ...(responseMimeType ? { responseMimeType } : {}),
-      ...(thinkingConfig ? { thinkingConfig } : {}),
-    },
-  });
+  const modelsToTry = [requestedModel, ...GEMINI_FALLBACK_MODELS.filter((m) => m !== requestedModel)];
+  let lastError = null;
 
-  try {
-    const contents = messagesToContents(nonSystemMessages);
-    const response = await model.generateContent({ contents });
-    trackGeminiCall(null, { success: true });
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const modelName = modelsToTry[i];
+    const isThinkingModel = /2\.5-flash|thinking/i.test(modelName);
+    const thinkingConfig =
+      isThinkingModel && options.thinkingBudget !== undefined
+        ? { thinkingBudget: options.thinkingBudget }
+        : isThinkingModel
+          ? { thinkingBudget: 0 }
+          : undefined;
 
-    const candidate = response.response.candidates?.[0];
-    const finishReason = candidate?.finishReason;
-    if (finishReason === "MAX_TOKENS") {
-      const truncErr = new Error("Gemini output truncated: maximum output tokens reached");
-      truncErr.kind = "truncated";
-      truncErr.status = 400;
-      truncErr.provider = "gemini";
-      truncErr.finishReason = "MAX_TOKENS";
-      throw truncErr;
-    }
-
-    const resultText = response.response.text();
-    const resultObj = {
-      text: resultText,
-      provider: "gemini",
+    const model = genAI.getGenerativeModel({
       model: modelName,
-      finishReason,
-      usageMetadata: response.response.usageMetadata,
-      toString() {
-        return resultText;
+      ...(systemInstruction ? { systemInstruction } : {}),
+      generationConfig: {
+        temperature: options.temperature ?? 0.1,
+        maxOutputTokens: options.max_tokens || options.maxOutputTokens || 1024,
+        ...(responseMimeType ? { responseMimeType } : {}),
+        ...(thinkingConfig ? { thinkingConfig } : {}),
       },
-      [Symbol.toPrimitive]() {
-        return resultText;
-      },
-    };
-    return resultObj;
-  } catch (error) {
-    trackGeminiCall(null, { success: false });
-    throw normalizeGeminiError(error);
+    });
+
+    try {
+      const contents = messagesToContents(nonSystemMessages);
+      const response = await model.generateContent({ contents });
+      trackGeminiCall(null, { success: true });
+
+      const candidate = response.response.candidates?.[0];
+      const finishReason = candidate?.finishReason;
+      if (finishReason === "MAX_TOKENS") {
+        const truncErr = new Error("Gemini output truncated: maximum output tokens reached");
+        truncErr.kind = "truncated";
+        truncErr.status = 400;
+        truncErr.provider = "gemini";
+        truncErr.finishReason = "MAX_TOKENS";
+        throw truncErr;
+      }
+
+      const resultText = response.response.text();
+      const resultObj = {
+        text: resultText,
+        provider: "gemini",
+        model: modelName,
+        finishReason,
+        usageMetadata: response.response.usageMetadata,
+        toString() {
+          return resultText;
+        },
+        [Symbol.toPrimitive]() {
+          return resultText;
+        },
+      };
+      return resultObj;
+    } catch (error) {
+      lastError = error;
+      const normalized = normalizeGeminiError(error);
+      const isRetryableModelError =
+        normalized.status === 429 ||
+        normalized.status === 404 ||
+        normalized.status >= 500 ||
+        normalized.kind === "quota_day" ||
+        normalized.kind === "rate_minute";
+
+      // If this model failed with quota exhaustion or unavailability and we have a fallback model, try next
+      if (isRetryableModelError && i < modelsToTry.length - 1) {
+        console.warn(`[gemini] Model ${modelName} hit ${normalized.kind || normalized.status} (${normalized.message?.slice(0, 80)}). Falling back to ${modelsToTry[i + 1]}...`);
+        continue;
+      }
+      break;
+    }
   }
+
+  trackGeminiCall(null, { success: false });
+  throw normalizeGeminiError(lastError);
 }

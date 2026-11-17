@@ -35,12 +35,12 @@ export default function Setup() {
       <section className="hero-panel">
         <div>
           <div className="eyebrow">Setup</div>
-          <h1>Finish your JOB-OPS onboarding.</h1>
-          <p>Gemini key, profile, aur CV complete hote hi scanner/evaluator/resume flow ready ho jayega.</p>
+          <h1>Finish your JobStrider onboarding.</h1>
+          <p>Configure your Gemini API key, target profile, and CV to activate the autonomous scanning and evaluation pipeline.</p>
         </div>
       </section>
 
-      <Panel title="Step 1 - Gemini API key" subtitle="Key browser me plaintext readback nahi hoti">
+      <Panel title="Step 1 - Gemini API key" subtitle="API key is stored securely and never displayed in plaintext">
         <div className="stack-gap">
           <label>
             Gemini API Key

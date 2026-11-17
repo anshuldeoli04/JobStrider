@@ -11,19 +11,21 @@ import { fileURLToPath } from "url";
 import readline from "readline";
 import { spawn } from "child_process";
 import {
-  APPLICATIONS_FILE,
+  OUTPUT_RESUMES_DIR,
+  REPO_ROOT,
   backupIfNeeded,
   loadApplications,
   loadConfig,
   loadCVWithCache,
-  withFileLockSync,
-  writeJsonFileAtomic,
+  upsertApplication,
 } from "./config-utils.mjs";
 import { callLLM } from "./llm/llmClient.mjs";
 import { validateFactGrounding } from "./llm/factValidator.mjs";
+import { sanitizePosting } from "./src/security/postingGuard.mjs";
+import { verifyPdfAts } from "./src/services/atsVerifier.mjs";
 
-const TEMPLATE_FILE = "./templates/resume-template.html";
-const OUTPUT_DIR = "./output/resumes";
+const TEMPLATE_FILE = path.resolve(REPO_ROOT, "templates/resume-template.html");
+const OUTPUT_DIR = OUTPUT_RESUMES_DIR;
 const DEFAULT_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -296,7 +298,9 @@ function renderHTML(d, template) {
 }
 function generatePDF(htmlFile, pdfFile) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(process.execPath, ["./generate-pdf.mjs", htmlFile, pdfFile]);
+    const proc = spawn(process.execPath, [path.resolve(REPO_ROOT, "generate-pdf.mjs"), htmlFile, pdfFile], {
+      cwd: REPO_ROOT,
+    });
     let out = "";
     proc.stdout.on("data", (d) => {
       out += d;
@@ -395,7 +399,9 @@ async function main() {
   let jobLabel = "";
 
   const args = process.argv.slice(2);
+  const nonInteractive = args.includes("--non-interactive");
   const jobIdArg = args.find((a) => a.startsWith("--job-id="))?.split("=")[1];
+  const jdFileArg = args.find((a) => a.startsWith("--jd-file="))?.slice("--jd-file=".length);
 
   if (jobIdArg) {
     const app = loadApplications().find((a) => a.id === jobIdArg);
@@ -405,6 +411,16 @@ async function main() {
     }
     jobContext = `Company: ${app.company}\nRole: ${app.role}\nLocation: ${app.location || "India"}\nGaps to address: ${(app.gaps || []).join(", ")}\nStrengths to highlight: ${(app.strengths || []).join(", ")}\nFit summary: ${app.fit_summary || ""}`;
     jobLabel = safeOutputStem(`${app.company}_${app.role}`);
+  } else if (jdFileArg) {
+    if (!fs.existsSync(jdFileArg)) {
+      console.error(`[ERROR] JD file not found: ${jdFileArg}`);
+      process.exit(1);
+    }
+    jobContext = fs.readFileSync(jdFileArg, "utf8");
+    jobLabel = safeOutputStem(jobContext.split("\n")[0], "job").slice(0, 40) || "job";
+  } else if (nonInteractive) {
+    console.error("[ERROR] --job-id or --jd-file is required in non-interactive mode.");
+    process.exit(1);
   } else {
     const apps = loadApplications();
     console.log("Select target job for tailored resume:\n");
@@ -438,10 +454,12 @@ async function main() {
 
   console.log("\nTailoring resume via routed LLM (Gemini primary, Groq fallback)... (15-25 seconds)\n");
 
+  const sanitizedContext = sanitizePosting(jobContext).cleanedText;
+
   let resumeData;
   let usedFallback = false;
   try {
-    const raw = await callLLM("tailor_resume", [{ role: "user", content: buildPrompt(cv, jobContext) }], {
+    const raw = await callLLM("tailor_resume", [{ role: "user", content: buildPrompt(cv, sanitizedContext) }], {
       config,
       temperature: 0.1,
       maxOutputTokens: 8192,
@@ -458,7 +476,7 @@ async function main() {
       check.violations.slice(0, 3).forEach((v) => console.warn(`   - ${v}`));
       console.log("Retrying tailoring once with strict grounding constraints...");
       try {
-        const retryPrompt = `${buildPrompt(cv, jobContext)}\n\nIMPORTANT: Your previous output had ungrounded claims:\n${check.violations.map((v) => `- ${v}`).join("\n")}\nStrictly fix these and include ONLY facts, skills, numbers, and companies directly found in the ORIGINAL CV.`;
+        const retryPrompt = `${buildPrompt(cv, sanitizedContext)}\n\nIMPORTANT: Your previous output had ungrounded claims:\n${check.violations.map((v) => `- ${v}`).join("\n")}\nStrictly fix these and include ONLY facts, skills, numbers, and companies directly found in the ORIGINAL CV.`;
         const retryRaw = await callLLM("tailor_resume", [{ role: "user", content: retryPrompt }], {
           config,
           temperature: 0.0,
@@ -499,9 +517,22 @@ async function main() {
   console.log(`[OK] HTML: ${htmlFile}`);
 
   console.log("Generating PDF...");
+  let atsAudit = null;
   try {
     await generatePDF(htmlFile, pdfFile);
     console.log(`[OK] PDF: ${pdfFile}`);
+    try {
+      atsAudit = await verifyPdfAts(pdfFile, {
+        jobDescription: sanitizedContext,
+        candidateName: resumeData.name,
+      });
+      console.log(`[OK] ATS Score: ${atsAudit.atsScore}/100 (${atsAudit.isSinglePage ? "1 Page" : `${atsAudit.pageCount} Pages`})`);
+      if (atsAudit.flags.length > 0) {
+        console.log(`   ATS Audit: ${atsAudit.flags.join(", ")}`);
+      }
+    } catch (atsErr) {
+      console.log(`[INFO] ATS Verification note: ${atsErr.message}`);
+    }
   } catch (error) {
     finalPdfFile = null;
     console.log("[WARN] PDF generation failed - please open the HTML in a browser -> Print -> Save as PDF");
@@ -520,19 +551,37 @@ async function main() {
   }
   console.log("-".repeat(55));
 
+  const toPortableOutputPath = (targetPath) => {
+    if (!targetPath) return null;
+    const rel = path.relative(path.resolve(OUTPUT_DIR, "../.."), targetPath).replace(/\\/g, "/");
+    return rel && !rel.startsWith("..") ? rel : targetPath;
+  };
+  const storedPdfPath = toPortableOutputPath(finalPdfFile);
+  const storedHtmlPath = toPortableOutputPath(htmlFile);
+
   if (jobIdArg) {
-    withFileLockSync(APPLICATIONS_FILE, () => {
-      const apps = loadApplications();
-      const idx = apps.findIndex((a) => a.id === jobIdArg);
-      if (idx >= 0) {
-        apps[idx].resume_pdf = finalPdfFile;
-        apps[idx].resume_html = htmlFile;
-        writeJsonFileAtomic(APPLICATIONS_FILE, apps, { lock: false });
-      }
-    });
+    const apps = loadApplications();
+    const match = apps.find((a) => a.id === jobIdArg);
+    if (match) {
+      upsertApplication({
+        ...match,
+        resume_pdf: storedPdfPath,
+        resume_html: storedHtmlPath,
+        ats_score: atsAudit?.atsScore ?? null,
+        ats_report: atsAudit ?? null,
+      });
+    }
     console.log("Linked in application tracker.\n");
   }
 
+  console.log(`RESUME_RESULT_JSON:${JSON.stringify({
+    jobId: jobIdArg || null,
+    resume_pdf: storedPdfPath,
+    resume_html: storedHtmlPath,
+    ats_score: atsAudit?.atsScore ?? null,
+    changes_made: resumeData.changes_made || [],
+    keywords_injected: resumeData.keywords_injected || [],
+  })}`);
   console.log(`\nOUTPUT:\n   PDF  -> ${finalPdfFile || "Not generated"}\n   HTML -> ${htmlFile}\n`);
 }
 

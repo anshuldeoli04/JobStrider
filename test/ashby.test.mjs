@@ -21,7 +21,7 @@ test("Ashby ATS Config: companies.json contains ashby type companies with slugs"
   assert.equal(meesho.slug, "meesho");
 });
 
-test("Ashby Normalization: maps Ashby posting-api payload to JOB-OPS job schema", () => {
+test("Ashby Normalization: maps Ashby posting-api payload to JobStrider job schema", () => {
   const sampleAshbyJob = {
     id: "a571b8e4-8176-4e31-aab6-2287ee810236",
     title: "Account Manager - India",

@@ -1,9 +1,10 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { REPO_ROOT } from "../config-utils.mjs";
+import { getDataFilePath } from "../config-utils.mjs";
+import { sanitizePosting } from "../src/security/postingGuard.mjs";
 
-const PROFILE_CACHE_FILE = path.resolve(REPO_ROOT, "data/cv-profile.json");
+const PROFILE_CACHE_FILE = getDataFilePath("cv-profile.json");
 
 export function parseCompactCV(cvText) {
   if (!cvText || typeof cvText !== "string") return "";
@@ -83,14 +84,15 @@ export function getCompactCVProfile(cvText) {
 
 export function buildScanEvaluationPrompt(job, cvCompact, experienceProfile) {
   const minYearsFact = job.min_experience_years != null ? `Minimum experience required: ${job.min_experience_years} years` : null;
+  const sanitizedContent = job.content ? sanitizePosting(String(job.content).slice(0, 800)).cleanedText : null;
   const jobSnippet = [
-    `Company: ${job.company || "Not specified"}`,
-    `Role: ${job.role || "Software Role"}`,
+    `Company: ${job.company ? sanitizePosting(job.company).cleanedText : "Not specified"}`,
+    `Role: ${job.role ? sanitizePosting(job.role).cleanedText : "Software Role"}`,
     `Location: ${job.location || "India / Remote"}`,
     job.salary ? `Salary: ${job.salary}` : null,
     job.experience ? `Experience required: ${job.experience}` : null,
     minYearsFact,
-    job.content ? `Details: ${String(job.content).slice(0, 800)}` : null,
+    sanitizedContent ? `Details: ${sanitizedContent}` : null,
   ].filter(Boolean).join("\n");
 
   return `You are a tech recruiter evaluating entry-level/fresher tech roles in India.
