@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * JobStriver Interview Preparation Assistant
+ * JobStrider Interview Preparation Assistant
  * Prepares stage-specific interview dossiers, STAR behavioral stories,
  * technical Q&A, and honest skill-gap bridges for tracked applications.
  *
@@ -29,7 +29,7 @@ import { logger } from "./logger.mjs";
 async function main() {
   console.clear();
   console.log("============================================================");
-  console.log("          JobStriver Interview Preparation Copilot");
+  console.log("          JobStrider Interview Preparation Copilot");
   console.log("   Tailored STAR Stories, Technical Prep & Gap Bridges");
   console.log("============================================================\n");
 

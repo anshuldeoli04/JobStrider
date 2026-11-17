@@ -3,7 +3,7 @@ set -e
 
 echo ""
 echo " ============================================"
-echo "  JOB-OPS - Autonomous AI Job Pipeline"
+echo "  JobStrider - Autonomous AI Job Pipeline"
 echo "  Setup Script for Linux & macOS"
 echo " ============================================"
 echo ""

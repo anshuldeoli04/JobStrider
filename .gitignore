@@ -1,5 +1,5 @@
 # ==============================================================================
-# JOB-OPS Comprehensive .gitignore
+# JobStrider Comprehensive .gitignore
 # Prevents accidental leak of credentials, AI keys, personal CVs, databases,
 # scraped scan results, sessions, logs, and build artifacts.
 # ==============================================================================

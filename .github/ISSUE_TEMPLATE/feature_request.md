@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea or new capability for JOB-OPS
+about: Suggest an idea or new capability for JobStrider
 title: '[FEAT] '
 labels: enhancement
 assignees: ''

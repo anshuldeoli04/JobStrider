@@ -1,5 +1,5 @@
 /**
- * JobStriver ATS Verifier
+ * JobStrider ATS Verifier
  * Audits compiled PDF resumes for ATS readability, extractable text layer,
  * contact detail integrity, clean glyph encoding, keyword match, and page budgeting.
  */

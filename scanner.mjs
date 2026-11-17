@@ -174,7 +174,7 @@ async function runScrapers(sources, companies, keywords, config, experienceProfi
 async function main() {
   console.clear();
   logger.info("============================================================");
-  logger.info("        JOB-OPS Scanner");
+  logger.info("        JobStrider Scanner");
   logger.info("  Greenhouse API + Lever API + Ashby API + FreeHire + Agent Reach + Naukri");
   logger.info("============================================================\n");
 

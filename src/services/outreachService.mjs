@@ -1,5 +1,5 @@
 /**
- * JobStriver Outreach & Follow-Up Copilot
+ * JobStrider Outreach & Follow-Up Copilot
  * Identifies quiet/stale applications and drafts professional, non-generic
  * follow-up emails, LinkedIn recruiter connection notes, and cover notes.
  */

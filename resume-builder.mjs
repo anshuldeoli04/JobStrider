@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Resume Builder
+ * JobStrider Resume Builder
  * Intelligently rebuilds and tailors resumes for each job application
  * Usage: node resume-builder.mjs
  *        node resume-builder.mjs --job-id=<id>
@@ -377,7 +377,7 @@ function getResumeTemplate() {
 async function main() {
   console.clear();
   console.log("============================================================");
-  console.log("                 JOB-OPS Resume Builder");
+  console.log("                 JobStrider Resume Builder");
   console.log("   Tailored Resumes for Every Job via Routed AI — 100% Free");
   console.log("============================================================\n");
 

@@ -2,7 +2,7 @@
 
 > Autonomous, zero-operating-cost AI job pipeline and control room for scanning, evaluating, and tailoring applications for early-career software engineering roles.
 
-[![CI](https://github.com/anshuldeoli04/JOB-OPS/actions/workflows/ci.yml/badge.svg)](https://github.com/anshuldeoli04/JOB-OPS/actions/workflows/ci.yml)
+[![CI](https://github.com/anshuldeoli04/JobStrider/actions/workflows/ci.yml/badge.svg)](https://github.com/anshuldeoli04/JobStrider/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org)
 

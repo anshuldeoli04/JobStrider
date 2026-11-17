@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Scan Evaluator
+ * JobStrider Scan Evaluator
  * Select discovered jobs from scan results and evaluate fit via routed LLM
  * Usage: node scan-evaluate.mjs
  */
@@ -117,7 +117,7 @@ export function displayPage(page, jobs = []) {
   const pageJobs = jobs.slice(start, end);
 
   console.clear();
-  console.log(`JOB-OPS Scan Evaluator — Page ${page + 1}/${totalPages} (${jobs.length} total jobs)\n`);
+  console.log(`JobStrider Scan Evaluator — Page ${page + 1}/${totalPages} (${jobs.length} total jobs)\n`);
 
   // Render table for current page jobs
   renderJobTable(pageJobs, start); // S.No should continue from start+1

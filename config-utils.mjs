@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Configuration & Utility Module
+ * JobStrider Configuration & Utility Module
  * Modular facade re-exporting partitioned services for configuration, storage,
  * validation, usage tracking, and experience heuristics.
  */

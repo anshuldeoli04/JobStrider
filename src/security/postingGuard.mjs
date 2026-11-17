@@ -1,5 +1,5 @@
 /**
- * JobStriver Posting Guard
+ * JobStrider Posting Guard
  * Deterministic sanitizer and adversarial prompt-injection detector for untrusted job postings.
  */
 

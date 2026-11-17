@@ -1,5 +1,5 @@
 /**
- * JobStriver Deep Job Reader (via Agent Reach)
+ * JobStrider Deep Job Reader (via Agent Reach)
  * Fetches and extracts full job descriptions from arbitrary web links
  * (including protected or client-rendered portals) via the agent-reach CLI.
  */

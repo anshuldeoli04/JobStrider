@@ -1,6 +1,6 @@
-# Contributing to JOB-OPS
+# Contributing to JobStrider
 
-Thank you for your interest in contributing to JOB-OPS!
+Thank you for your interest in contributing to JobStrider!
 
 ## Code of Conduct
 
@@ -8,7 +8,7 @@ Please treat all contributors with respect, courtesy, and professionalism.
 
 ## Licensing of Contributions
 
-By submitting a pull request or patch to JOB-OPS, you agree that your contributions will be licensed under the project's [MIT License](./LICENSE).
+By submitting a pull request or patch to JobStrider, you agree that your contributions will be licensed under the project's [MIT License](./LICENSE).
 
 ## How to Contribute
 

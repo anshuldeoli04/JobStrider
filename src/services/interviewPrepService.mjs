@@ -1,5 +1,5 @@
 /**
- * JobStriver Interview Preparation Engine
+ * JobStrider Interview Preparation Engine
  * Generates role-specific prep packs, STAR behavioral stories, technical deep dives,
  * and skill gap bridge answers grounded in the candidate's verified CV.
  */

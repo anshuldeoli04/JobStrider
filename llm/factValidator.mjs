@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Fact Validator
+ * JobStrider Fact Validator
  * Deterministic grounding verification for tailored resume outputs.
  * Ensures generated skills, employers, institutions, and metrics strictly
  * originate from the candidate's original CV.

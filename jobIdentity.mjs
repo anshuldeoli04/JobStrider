@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Job Identity & Canonicalization Module
+ * JobStrider Job Identity & Canonicalization Module
  * Unified deduplication, URL canonicalization, and job matching.
  */
 

@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Key & Quota Management Layer
+ * JobStrider Key & Quota Management Layer
  *
  * Provides:
  * 1. Single active Gemini key resolution

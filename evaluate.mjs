@@ -1,5 +1,5 @@
 /**
- * JOB-OPS Evaluator
+ * JobStrider Evaluator
  * Free job evaluation using Gemini 2.5 Flash API
  * Usage: node evaluate.mjs
  */
@@ -134,7 +134,7 @@ ${result.negotiation_note}
 ${result.action_items?.map((a, i) => `${i + 1}. ${a}`).join("\n")}
 
 ---
-*JOB-OPS Free System | ${timestamp}*
+*JobStrider System | ${timestamp}*
 `;
   fs.writeFileSync(reportFile, reportContent);
 
@@ -175,7 +175,7 @@ async function main() {
     console.clear();
   }
   logger.info("============================================================");
-  logger.info("        JOB-OPS Job Evaluator (Gemini 2.5 Flash Free)");
+  logger.info("        JobStrider Job Evaluator (Gemini 2.5 Flash Free)");
   logger.info("============================================================\n");
 
   const config = loadConfig();

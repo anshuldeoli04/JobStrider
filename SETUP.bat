@@ -1,10 +1,10 @@
 @echo off
-title JOB-OPS Setup
+title JobStrider Setup
 color 0A
 
 echo.
 echo  ============================================
-echo   JOB-OPS - Autonomous AI Job Pipeline
+echo   JobStrider - Autonomous AI Job Pipeline
 echo   Setup Script for Windows (CLI Edition)
 echo  ============================================
 echo.

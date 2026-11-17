@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PDF generator for JOB-OPS resume builder.
+ * PDF generator for JobStrider resume builder.
  * Uses the project's Playwright dependency so Windows users do not need
  * Python WeasyPrint/native GTK libraries just to export a resume PDF.
  */

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# JOB-OPS: Standalone CLI Distribution Exporter
+# JobStrider: Standalone CLI Distribution Exporter
 # Exports public CLI files from an explicit allowlist and verifies zero-leak guards.
 # ==============================================================================
 
 set -euo pipefail
 
-DEST_DIR="${1:-../JOB-OPS-PUBLIC-EXPORT}"
+DEST_DIR="${1:-../JOBSTRIDER-PUBLIC-EXPORT}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "=== JOB-OPS Public Export Pipeline ==="
+echo "=== JobStrider Public Export Pipeline ==="
 echo "Source: ${REPO_ROOT}"
 echo "Target: ${DEST_DIR}"
 

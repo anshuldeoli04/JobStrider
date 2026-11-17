@@ -1,6 +1,6 @@
-# JOB-OPS Frontend
+# JobStrider Frontend
 
-This folder adds a dedicated frontend workspace for JOB-OPS.
+This folder adds a dedicated frontend workspace for JobStrider.
 
 ## What's included
 

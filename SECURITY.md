@@ -14,6 +14,6 @@ We acknowledge reports within 72 hours and aim to publish a fix or advisory with
 
 ## Local Security Architecture
 
-JOB-OPS is designed as a standalone local developer CLI tool:
+JobStrider is designed as a standalone local developer CLI tool:
 - **Process Isolation**: Subprocesses spawned by the CLI inherit a strictly sanitized environment (`sanitizeChildEnv`). System secrets, private credentials, and unrelated environment variables are stripped before executing child processes or scraper runtimes.
 - **Secrets & Credentials**: Bring Your Own Key (BYOK) architecture. API keys are stored locally in `.env`. Never commit `.env` or `config.local.json` to version control.
