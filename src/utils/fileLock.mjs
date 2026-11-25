@@ -47,7 +47,7 @@ export async function withFileLock(filePath, callback, { timeoutMs = 10000, retr
         try { fs.unlinkSync(lockPath); } catch {}
       }
     } catch (err) {
-      if (err.code === "EEXIST") {
+      if (err.code === "EEXIST" || err.code === "EPERM" || err.code === "EBUSY" || err.code === "EACCES") {
         try {
           const stats = fs.statSync(lockPath);
           if (Date.now() - stats.mtimeMs > staleLockMs) {
@@ -79,7 +79,7 @@ export function withFileLockSync(filePath, callback, { timeoutMs = 10000, retryM
         try { fs.unlinkSync(lockPath); } catch {}
       }
     } catch (err) {
-      if (err.code === "EEXIST") {
+      if (err.code === "EEXIST" || err.code === "EPERM" || err.code === "EBUSY" || err.code === "EACCES") {
         try {
           const stats = fs.statSync(lockPath);
           if (Date.now() - stats.mtimeMs > staleLockMs) {
@@ -97,7 +97,7 @@ export function withFileLockSync(filePath, callback, { timeoutMs = 10000, retryM
 }
 
 function writeJsonFileAtomicUnlocked(filePath, value) {
-  const tempFile = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const tempFile = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
   const serialized = JSON.stringify(value, null, 2);
   fs.writeFileSync(tempFile, `${serialized}\n`, "utf8");
   try {

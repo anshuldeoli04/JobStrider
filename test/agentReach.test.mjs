@@ -77,6 +77,7 @@ test("Agent Reach Scraper: Normalizes mocked CLI items into standard JobStrider 
 
 test("Agent Reach Scraper: Handles ok:false error envelopes without crashing", async () => {
   const scraper = new AgentReachScraper();
+  scraper.isAvailable = () => true;
 
   // Mock rate limited response
   scraper.runCli = () => ({

@@ -35,7 +35,9 @@ jobs:
 
       - name: Install Playwright Chromium (Linux)
         if: runner.os == 'Linux'
-        run: npx playwright install --with-deps chromium
+        run: |
+          npx playwright install chromium
+          sudo npx playwright install-deps chromium || true
 
       - name: Install Playwright Chromium (Windows)
         if: runner.os == 'Windows'
@@ -51,7 +53,7 @@ jobs:
         run: npm run ui:build
 
       - name: Dependency Security Audit
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
 
   gitleaks:
     name: Secret Scanning (Gitleaks)

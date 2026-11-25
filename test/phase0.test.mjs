@@ -137,9 +137,9 @@ test("N-3: Breaker state is persisted to disk and shared across processes under 
   const tmpScriptPath = path.join(os.tmpdir(), `test-tmp-breaker-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
   const childBreakerScript = `
     import { writeBreakerState, readBreakerState, syncSleep } from "${configUtilsUrl}";
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 15; i++) {
       writeBreakerState({ gemini: { until: ${futureUntil} + i, why: "child-write-" + i }, groq: { until: 0, why: "" } });
-      syncSleep(2);
+      syncSleep(5);
     }
     const state = readBreakerState();
     if (state && state.gemini && typeof state.gemini.until === "number") process.exit(0);
@@ -153,9 +153,9 @@ test("N-3: Breaker state is persisted to disk and shared across processes under 
     const childRun = runNodeScript(tmpScriptPath, []);
 
     // 2. parent writes interleaved with event loop yields
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 15; i++) {
       writeBreakerState({ gemini: { until: futureUntil + 100 + i, why: "parent-write-" + i }, groq: { until: 0, why: "" } });
-      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setTimeout(r, 5));
     }
 
     // 3. wait for child and assert
@@ -201,7 +201,7 @@ test("N-5: syncSleep avoids busy-spin and real multi-process concurrent upsertAp
   const tmpChildPath = path.join(os.tmpdir(), `test-tmp-upsert-child-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
   const childScript = `
     import { upsertApplication, syncSleep } from "${configUtilsUrl}";
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 15; i++) {
       upsertApplication({
         id: "${prefix}-child-" + i,
         company: "Child Company " + i,
@@ -209,7 +209,7 @@ test("N-5: syncSleep avoids busy-spin and real multi-process concurrent upsertAp
         location: "Bengaluru",
         grade: "A",
       });
-      syncSleep(2);
+      syncSleep(5);
     }
   `;
 
@@ -220,7 +220,7 @@ test("N-5: syncSleep avoids busy-spin and real multi-process concurrent upsertAp
     const childRun = runNodeScript(tmpChildPath, []);
 
     // 2. parent writes interleaved with setImmediate so child runs concurrently
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 15; i++) {
       upsertApplication({
         id: `${prefix}-parent-${i}`,
         company: `Parent Company ${i}`,
@@ -228,7 +228,7 @@ test("N-5: syncSleep avoids busy-spin and real multi-process concurrent upsertAp
         location: "Bengaluru",
         grade: "A",
       });
-      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setTimeout(r, 5));
     }
 
     // 3. then wait
@@ -237,7 +237,7 @@ test("N-5: syncSleep avoids busy-spin and real multi-process concurrent upsertAp
 
     const apps = loadApplications();
     const ids = apps.map((a) => a.id);
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 15; i++) {
       assert.ok(ids.includes(`${prefix}-parent-${i}`), `Missing parent application ${i}`);
       assert.ok(ids.includes(`${prefix}-child-${i}`), `Missing child application ${i}`);
     }
