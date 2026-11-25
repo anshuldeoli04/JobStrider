@@ -3,14 +3,7 @@ import path from "path";
 
 export function syncSleep(ms) {
   const target = Date.now() + ms;
-  try {
-    const int32 = new Int32Array(new SharedArrayBuffer(4));
-    while (Date.now() < target) {
-      Atomics.wait(int32, 0, 0, Math.max(1, target - Date.now()));
-    }
-  } catch {
-    while (Date.now() < target) {}
-  }
+  while (Date.now() < target) {}
 }
 
 export function sleep(ms) {
