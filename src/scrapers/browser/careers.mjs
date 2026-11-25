@@ -125,7 +125,9 @@ export class CareersPageScraper extends BaseScraper {
                 const href = anchor.href;
                 const card = anchor.closest("li, article, section, div");
                 const content = normalize(card?.textContent || text);
-                return { role: text, location: "Unknown", url: href, content };
+                const locPattern = /\b(remote|work from home|wfh|hybrid|bengaluru|bangalore|gurugram|gurgaon|delhi|new delhi|ncr|delhi ncr|noida|mumbai|navi mumbai|pune|hyderabad|chennai|kolkata|ahmedabad|jaipur|chandigarh|indore|kochi|india)\b/i;
+                const extractedLoc = content.match(locPattern)?.[0] || "";
+                return { role: text, location: extractedLoc, url: href, content };
               })
               .filter((item) => item.role && item.role.length <= 140 && roleWords.test(`${item.role} ${item.content}`));
           });
@@ -169,7 +171,8 @@ export class CareersPageScraper extends BaseScraper {
               keywords.some((kw) => titleLower.includes(kw.toLowerCase())) ||
               passesAutoQuickFilter({ role: job.role }, config);
 
-            const locMatch = isLocationFit(job.location, config);
+            const locCandidate = job.location || job.content;
+            const locMatch = isLocationFit(locCandidate, config, "careers_page");
             return kwMatch && locMatch;
           });
 

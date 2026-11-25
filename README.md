@@ -5,6 +5,16 @@
 [![CI](https://github.com/anshuldeoli04/JobStrider/actions/workflows/ci.yml/badge.svg)](https://github.com/anshuldeoli04/JobStrider/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org)
+[![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-blue.svg)](https://github.com/anshuldeoli04/JobStrider/releases)
+[![Website](https://img.shields.io/badge/website-live-success.svg)](https://anshuldeoli04.github.io/JobStrider/)
+
+---
+
+### 📥 One-Click Desktop App (Windows .exe)
+> **Zero setup required.** For job seekers who want to run JobStrider immediately without terminal commands or Node.js:
+> 
+> 🔗 **[Download JobStrider v4.0.0 (.exe)](https://github.com/anshuldeoli04/JobStrider/releases/latest/download/JobStrider-4.0.0-x64.exe)** *(Windows 10/11 x64, 134 MB)*  
+> 🌐 **Interactive Web Overview:** [https://anshuldeoli04.github.io/JobStrider/](https://anshuldeoli04.github.io/JobStrider/)
 
 ---
 
@@ -52,13 +62,136 @@ flowchart TD
 
 ---
 
-## 📌 Architecture & Design Principles
+## 📌 Full System Architecture & Design Principles
 
-JobStrider is designed around three strict operational constraints:
-1. **Zero Operating Cost**: Built to run entirely on free-tier APIs and local hardware. No subscriptions, hosted proxies, or paid vector databases required.
-2. **Bring Your Own Key (BYOK)**: Your API keys stay on your machine (`.env`). Your CV and job descriptions are sent to the LLM provider you configure (Google Gemini, optionally Groq) for scoring and tailoring. See Disclaimers.
-3. **Autonomous CLI Architecture**:
-   - Standalone command-line workflow backed by atomic JSON disk storage (`data/`). Requires zero database configuration, zero background services, and runs entirely in your terminal.
+The complete architecture of JobStrider is structured into five isolated runtime zones, decoupling user interaction, high-throughput multi-source harvesting, pre-filtering security gates, BYOK LLM evaluation, and local-first persistence:
+
+```mermaid
+flowchart LR
+    subgraph S1["🖥️ Client Presentation & CLI Cockpit"]
+        USER["👤 Job Seeker / Dev"]
+        COCKPIT["⚡ Web Cockpit<br/><code>frontend/src/App.jsx</code><br/>React + Vite SPA"]
+        CLI["💻 AutoFlow CLI<br/><code>autoflow.mjs</code><br/>Interactive CLI Driver"]
+    end
+
+    subgraph S2["⚙️ Local Node.js Orchestrator & Harvester"]
+        BRIDGE["🌉 Express Bridge<br/><code>frontend/server/zeroApi.js</code><br/>REST APIs & SSE Hub :3001"]
+        RUNNER["⏱️ Process Runner<br/><code>process-runner.mjs</code><br/>Sanitized Subprocess Runner"]
+        HEALTH["🩺 Source Health<br/><code>sourceVerifier.mjs</code><br/>Circuit Breaker State Machine"]
+        ATS_SCAN["⚡ ATS API Scrapers<br/><code>src/scrapers/</code><br/>Greenhouse • Lever • Ashby • FreeHire"]
+        STEALTH["🕵️ Stealth Scrapers<br/><code>browserLauncher.mjs</code><br/>Playwright Chromium + Stealth"]
+        REACH["🌐 Deep Job Reader<br/><code>deepJobReader.mjs</code><br/>Agent Reach CLI Integration"]
+    end
+
+    subgraph EXT["🌐 External Platforms & APIs"]
+        BOARDS[("🏛️ Public ATS Boards<br/>Greenhouse • Lever • Ashby")]
+        PORTALS[("📑 Job Portals<br/>LinkedIn • Naukri • Internshala")]
+        AI_CLOUD[("☁️ BYOK AI Cloud<br/>Google Gemini 2.5 • Groq Llama 3")]
+    end
+
+    subgraph S3["🛡️ Zero-Cost Security & Pre-Filter Sandbox"]
+        GUARD["🛡️ Adversarial Posting Guard<br/><code>postingGuard.mjs</code><br/>Strips injections, HTML & homoglyphs"]
+        FILTER["⚡ Pre-Rank & Filter<br/><code>jobFilterService.mjs</code><br/>Stoplist • Experience • Location Fit"]
+        IDENT["🔑 Job Identity<br/><code>jobIdentity.mjs</code><br/>Canonical URL & Dedup Hash"]
+    end
+
+    subgraph S4["🤖 AI Fit Evaluation & ATS Compilation"]
+        LLM["🧠 LLM Provider Router<br/><code>llmClient.mjs</code><br/>BYOK Key Manager & Breakers"]
+        VALIDATOR["🔍 Fact Validator<br/><code>factValidator.mjs</code><br/>Strict Grounding against cv.md"]
+        TAILOR["📝 Resume Tailor<br/><code>resume-builder.mjs</code><br/>Tailors summary, skills & projects"]
+        PDF["📄 Playwright PDF<br/><code>generate-pdf.mjs</code><br/>Pixel-perfect ATS A4 printer"]
+        VERIFIER["✅ Binary ATS Verifier<br/><code>atsVerifier.mjs</code><br/>0-100 ATS Score • Spill Audit"]
+    end
+
+    subgraph S5["💾 Local-First Storage & Artifact Repository"]
+        SQLITE[("🗄️ SQLite Engine<br/><code>src/storage/db.mjs</code><br/>WAL Mode • Indexed Queries")]
+        ATOMIC[("📁 Atomic JSON Store<br/><code>src/utils/fileLock.mjs</code><br/>applications.json • scan-cache.json")]
+        REPOS[("📦 Output Artifacts<br/><code>output/resumes/</code><br/><code>reports/interview-prep/</code>")]
+    end
+
+    %% Client Layer Connections
+    USER -->|"Browser UI"| COCKPIT
+    USER -->|"Terminal Exec"| CLI
+    COCKPIT -->|"REST & SSE"| BRIDGE
+    CLI -->|"Exec Pipeline"| RUNNER
+    BRIDGE -->|"Spawn Subproc"| RUNNER
+
+    %% Harvester & External
+    HEALTH -.->|"Circuit State"| ATS_SCAN
+    ATS_SCAN <-->|"REST APIs"| BOARDS
+    RUNNER --> ATS_SCAN
+    RUNNER --> STEALTH
+    RUNNER --> REACH
+    REACH <-->|"Reach Scrape"| PORTALS
+    STEALTH <-->|"Playwright Scrape"| PORTALS
+
+    %% Ingestion to Security & Filter
+    ATS_SCAN -->|"Discovered Jobs"| FILTER
+    STEALTH -->|"Browser Jobs"| FILTER
+    REACH -->|"Parsed Jobs"| FILTER
+    FILTER -->|"Deduplicate"| IDENT
+    FILTER -->|"Pass Filter"| GUARD
+
+    %% AI Evaluation
+    GUARD -->|"Sanitized JDs"| LLM
+    LLM <-->|"BYOK Prompts"| AI_CLOUD
+    LLM -->|"Fit Score & Gaps"| VALIDATOR
+
+    %% Tailoring & ATS Compilation
+    VALIDATOR -->|"Grade A/B Matches"| TAILOR
+    TAILOR -->|"HTML Template"| PDF
+    PDF -->|"Compiled PDF"| VERIFIER
+
+    %% Persistence
+    TAILOR -->|"Save Application"| SQLITE
+    VERIFIER -->|"Sync JSON"| ATOMIC
+    VERIFIER -->|"Write PDF & Dossier"| REPOS
+
+    classDef client fill:#0f172a,stroke:#38bdf8,stroke-width:1.5px,color:#f8fafc;
+    classDef runtime fill:#1e293b,stroke:#818cf8,stroke-width:1.5px,color:#f8fafc;
+    classDef security fill:#2e1065,stroke:#c084fc,stroke-width:1.5px,color:#f8fafc;
+    classDef ai fill:#052e16,stroke:#34d399,stroke-width:1.5px,color:#f8fafc;
+    classDef storage fill:#1c1917,stroke:#fb923c,stroke-width:1.5px,color:#f8fafc;
+    classDef external fill:#18181b,stroke:#a1a1aa,stroke-dasharray:3 3,color:#e4e4e7;
+
+    class USER,COCKPIT,CLI client;
+    class BRIDGE,RUNNER,HEALTH,ATS_SCAN,STEALTH,REACH runtime;
+    class GUARD,FILTER,IDENT security;
+    class LLM,VALIDATOR,TAILOR,PDF,VERIFIER ai;
+    class SQLITE,ATOMIC,REPOS storage;
+    class BOARDS,PORTALS,AI_CLOUD external;
+```
+
+> [!TIP]
+> **Interactive Archify Diagram**: An explorable, vector-accurate standalone HTML architecture visualization with dark/light mode and component source tracing is available at [`.archify/architecture-full-system-20261117-134500/full-system.html`](.archify/architecture-full-system-20261117-134500/full-system.html).
+
+### Architectural Invariants & Subsystem Design
+
+1. **Dual Cockpit Interface (Presentation)**:
+   - **Vite + React Dashboard (`frontend/`)**: Real-time control room consuming REST endpoints and Server-Sent Events (SSE) for live runner log streaming.
+   - **Autonomous AutoFlow CLI (`autoflow.mjs`)**: Headless or interactive terminal runner with two-stage human-in-the-loop checkpoints before LLM evaluation and resume generation.
+
+2. **Orchestrator & Ingestion Engine (Harvester)**:
+   - **Express Bridge (`frontend/server/zeroApi.js`)**: Isolated backend server on port 3001 with rate limiting and strict CORS handling.
+   - **Subprocess Isolation (`process-runner.mjs`)**: Spawns isolated worker processes with sanitized environments (`sanitizeChildEnv`), systematically scrubbing sensitive credentials and database master keys.
+   - **Multi-Channel Harvesters (`src/scrapers/`)**: Fetches jobs via official REST endpoints (Greenhouse, Lever, Ashby, FreeHire), Playwright Chromium with stealth plugins for complex portals, and the Agent Reach CLI for credential-free LinkedIn deep-scraping.
+   - **Fetch Health State Machine (`sourceVerifier.mjs`)**: Continuous health classification across 7 states (`HEALTHY`, `DEGRADED`, `EMPTY`, `SELECTOR_BROKEN`, `BLOCKED`, `THROTTLED_TIMEOUT`, `ERROR`) logged to `data/health-log.jsonl`.
+
+3. **Zero-Cost Security & Pre-Filter Sandbox**:
+   - **Adversarial Posting Guard (`postingGuard.mjs`)**: Strips invisible zero-width Unicode characters (`\u200B-\u200D`, `\uFEFF`), script tags, HTML comments, and heuristic prompt-injection triggers before sending text to AI models.
+   - **Deterministic Pre-Filters (`jobFilterService.mjs`, `experienceService.mjs`)**: Filters titles against stoplists, enforces experience fit criteria, and filters locations at zero API token cost.
+   - **Job Identity & Deduplication (`jobIdentity.mjs`)**: Canonicalizes URLs, scrubs tracking parameters, and computes deterministic content hashes to eliminate duplicate postings across runs.
+
+4. **AI Fit Evaluation & ATS Compilation Engine**:
+   - **Multi-Provider LLM Router (`llm/llmClient.mjs`)**: Direct Bring-Your-Own-Key (BYOK) client managing Google Gemini 2.5 Flash and Groq Llama 3 with quota trackers and circuit breakers.
+   - **Strict Grounding Fact Validator (`llm/factValidator.mjs`)**: Deterministic verification preventing AI hallucinations; enforces that all tailored skills, employers, and degrees originate strictly from the candidate's master [`cv.md`](./cv.md).
+   - **Pixel-Perfect Resume Tailoring (`resume-builder.mjs`, `generate-pdf.mjs`)**: Generates targeted HTML templates and renders them to print-ready A4 PDFs using headless Playwright.
+   - **Binary ATS Verifier (`atsVerifier.mjs`)**: Audits compiled PDF binary streams using `pdf-parse`, scoring text layer readability (0-100 pts), validating contact integrity, and preventing multi-page overflow spills.
+
+5. **Local-First Storage & Data Sovereignty**:
+   - **Embedded SQLite Engine (`src/storage/db.mjs`)**: `better-sqlite3` database (`data/job-ops.db`) operating in WAL mode with indexes across companies, grades, and statuses.
+   - **Atomic JSON Synchronization (`src/utils/fileLock.mjs`)**: Disk storage backed by transactional file locking (`applications.json`, `scan-cache.json`) for zero-database deployment flexibility.
+   - **Immutable File Artifacts**: Rendered resumes and interview preparation dossiers reside strictly in local directories (`output/resumes/` and `reports/`).
 
 ---
 

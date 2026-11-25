@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Autonomous AI job pipeline for scanning, evaluating, and tailoring applications for early-career software roles.",
+  "author": "JobStrider Team <contact@jobstrider.dev>",
   "license": "MIT",
   "bin": {
     "jobstrider": "./autoflow.mjs",
@@ -21,7 +22,11 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "main": "desktop/main.mjs",
   "scripts": {
+    "desktop": "electron desktop/main.mjs",
+    "desktop:build": "node scripts/build-protected.mjs",
+    "desktop:build:raw": "npm run ui:build && electron-builder --win",
     "start": "node scripts/start-ui.mjs",
     "ui": "node scripts/start-ui.mjs",
     "ui:build": "npm --prefix frontend run build",
@@ -51,5 +56,46 @@
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "user-agents": "^1.1.352"
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "javascript-obfuscator": "^5.10.1"
+  },
+  "build": {
+    "appId": "com.jobstrider.desktop",
+    "productName": "JobStrider",
+    "npmRebuild": false,
+    "asar": true,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      {
+        "from": ".desktop-staging",
+        "to": "."
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

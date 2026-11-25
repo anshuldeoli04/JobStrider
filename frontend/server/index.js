@@ -91,6 +91,23 @@ app.get('/health', (_req, res) => {
 app.use('/api', zeroApi);
 app.use(zeroApi);
 
+const distDir = path.resolve(__dirname, '../dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/files') || path.extname(req.path)) {
+      return next();
+    }
+    if (req.accepts('html')) {
+      const indexHtml = path.join(distDir, 'index.html');
+      if (fs.existsSync(indexHtml)) {
+        return res.sendFile(indexHtml);
+      }
+    }
+    next();
+  });
+}
+
 app.use((error, _req, res, _next) => {
   res.status(error.statusCode || 500).json({
     error: error.message || 'Unexpected server error'

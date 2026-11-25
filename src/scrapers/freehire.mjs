@@ -56,7 +56,7 @@ export class FreeHireScraper extends BaseScraper {
         }
 
         // Location fit check
-        if (!isLocationFit(location, config.target_locations)) {
+        if (!isLocationFit(location, config)) {
           continue;
         }
 
@@ -74,11 +74,11 @@ export class FreeHireScraper extends BaseScraper {
           discovered_at: new Date().toISOString(),
         };
 
-        if (!passesAutoQuickFilter(candidateJob, keywords)) {
+        if (!passesAutoQuickFilter(candidateJob, config)) {
           continue;
         }
 
-        pushIfExperienceFit(results, candidateJob, experienceProfile);
+        pushIfExperienceFit(results, candidateJob, experienceProfile, config);
       }
 
       stats.matched = results.length;

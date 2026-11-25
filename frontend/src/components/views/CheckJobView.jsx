@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { getGradeLabel, isSafeUrl } from '../../utils/jobHelpers';
+import { findMatchingAffiliateTracks, MOCK_INTERVIEW_PARTNER } from '../../utils/affiliatePartners';
+import { AffiliateSkillCard, MockInterviewCard } from '../ui/AffiliateSkillCard';
 
 export default function CheckJobView() {
   const config = useAppStore((state) => state.config);
@@ -259,6 +261,9 @@ export default function CheckJobView() {
                     </span>
                   ))}
                 </div>
+                {findMatchingAffiliateTracks(result.gaps).map((track, idx) => (
+                  <AffiliateSkillCard key={idx} track={track} />
+                ))}
               </div>
             )}
 
@@ -271,6 +276,10 @@ export default function CheckJobView() {
                   ))}
                 </ol>
               </div>
+            )}
+
+            {Number(result.score || 0) >= 6.5 && (
+              <MockInterviewCard partner={MOCK_INTERVIEW_PARTNER} />
             )}
 
             {/* Action Footer */}

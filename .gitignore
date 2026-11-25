@@ -97,6 +97,8 @@ id_ed25519*
 # Build Artifacts & Bundles
 frontend/dist/
 frontend/temp-dist/
+dist-electron/
+.desktop-staging/
 
 # Logs & Diagnostics
 *.log

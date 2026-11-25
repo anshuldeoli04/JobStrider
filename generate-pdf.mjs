@@ -28,7 +28,14 @@ async function main() {
 
   fs.mkdirSync(path.dirname(pdfFile), { recursive: true });
 
-  const browser = await chromium.launch({ headless: true, args: ["--headless=new"] });
+  const sandboxArgs = (
+    process.env.DISABLE_BROWSER_SANDBOX === "1" ||
+    process.env.CI === "true" ||
+    process.env.CODESPACES === "true" ||
+    fs.existsSync("/.dockerenv")
+  ) ? ["--no-sandbox", "--disable-setuid-sandbox"] : [];
+
+  const browser = await chromium.launch({ headless: true, args: ["--headless=new", ...sandboxArgs] });
   try {
     const page = await browser.newPage({ viewport: { width: 1240, height: 1754 } });
     await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });

@@ -18,7 +18,7 @@ export function isAgentReachAvailable() {
       stdio: "pipe",
       encoding: "utf8",
       shell: false,
-      timeout: 3000,
+      timeout: 8000,
     });
     return res.status === 0;
   } catch {
@@ -161,7 +161,7 @@ export class AgentReachScraper extends BaseScraper {
         stdio: "pipe",
         encoding: "utf8",
         shell: false,
-        timeout: 15000,
+        timeout: 30000,
       });
 
       if (result.status !== 0 || !result.stdout) {
@@ -205,7 +205,8 @@ export class AgentReachScraper extends BaseScraper {
 
     logger.info(`\nAgent Reach — ${platformLabel} Discovery`);
 
-    if (!isAgentReachAvailable()) {
+    const isAvail = typeof this.isAvailable === "function" ? this.isAvailable() : isAgentReachAvailable();
+    if (!isAvail) {
       logger.info(`   ℹ agent-reach CLI not found on system path. Skipping Agent Reach ${platformLabel} discovery.`);
       results.rawCount = 0;
       results.healthStatus = HEALTH.SKIPPED;
@@ -258,7 +259,7 @@ export class AgentReachScraper extends BaseScraper {
             continue;
           }
 
-          if (!isLocationFit(location, targetLocations)) {
+          if (!isLocationFit(location, config)) {
             continue;
           }
 
@@ -275,7 +276,7 @@ export class AgentReachScraper extends BaseScraper {
             discovered_at: new Date().toISOString(),
           };
 
-          if (!passesAutoQuickFilter(candidateJob, keywords)) {
+          if (!passesAutoQuickFilter(candidateJob, config)) {
             continue;
           }
 

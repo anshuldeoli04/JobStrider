@@ -1,6 +1,12 @@
 import axios from 'axios';
 
-const rawBase = import.meta.env.VITE_API_BASE_URL || '/api';
+const rawBase =
+  (typeof window !== 'undefined' && window.__JOBSTRIDER_API_BASE__) ||
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file:')
+    ? `${window.location.origin}/api`
+    : 'http://localhost:3001/api');
+
 const apiBaseUrl = rawBase.endsWith('/api')
   ? rawBase.replace(/\/+$/, '')
   : `${rawBase.replace(/\/+$/, '')}/api`;
@@ -25,9 +31,11 @@ export const api = {
   },
   openProtectedFile: (filePath) => {
     if (!filePath) return;
-    const target = filePath.startsWith('/files/') || filePath.startsWith('http')
+    const backendOrigin = apiBaseUrl.replace(/\/api\/?$/, '');
+    const cleanRel = filePath.replace(/^\/+/, '');
+    const target = filePath.startsWith('http')
       ? filePath
-      : `/files/${filePath.replace(/^\/+/, '')}`;
+      : `${backendOrigin}/${cleanRel.startsWith('files/') ? cleanRel : `files/${cleanRel}`}`;
     window.open(target, '_blank', 'noopener,noreferrer');
   },
   bootstrap: () =>

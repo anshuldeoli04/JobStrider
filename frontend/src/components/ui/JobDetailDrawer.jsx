@@ -14,6 +14,8 @@ import {
 import { useAppStore } from '../../store/useAppStore';
 import ModalDialog from './ModalDialog';
 import { STATUS_OPTIONS, getGradeLabel, isSafeUrl } from '../../utils/jobHelpers';
+import { findMatchingAffiliateTracks, MOCK_INTERVIEW_PARTNER } from '../../utils/affiliatePartners';
+import { AffiliateSkillCard, MockInterviewCard } from './AffiliateSkillCard';
 
 export default function JobDetailDrawer() {
   const job = useAppStore((state) => state.selectedJob);
@@ -192,6 +194,9 @@ export default function JobDetailDrawer() {
                   </span>
                 ))}
               </div>
+              {findMatchingAffiliateTracks(job.gaps).map((track, idx) => (
+                <AffiliateSkillCard key={idx} track={track} />
+              ))}
             </div>
           )}
 
@@ -215,6 +220,8 @@ export default function JobDetailDrawer() {
                   ))}
                 </ol>
               ) : null}
+
+              {score >= 6.5 && <MockInterviewCard partner={MOCK_INTERVIEW_PARTNER} />}
             </div>
           )}
 

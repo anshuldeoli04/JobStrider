@@ -36,8 +36,9 @@ export class WellfoundScraper extends BaseScraper {
 
           const title = await page.title();
           const pageText = (await page.locator("body").innerText({ timeout: 5000 }).catch(() => "")).toLowerCase();
-          if (pageText.includes("sign in") && pageText.includes("continue")) {
-            logger.warn(`   login wall likely active - title: ${title.slice(0, 80)}`);
+          if ((pageText.includes("sign in") && pageText.includes("continue")) || pageText.includes("just a moment") || title.toLowerCase().includes("attention required")) {
+            logger.warn(`   login wall or challenge likely active - title: ${title.slice(0, 80)}`);
+            results.blocked = true;
           }
 
           const jobs = await page.evaluate(() => {
@@ -140,6 +141,8 @@ export class WellfoundScraper extends BaseScraper {
       results.healthStatus = HEALTH.HEALTHY;
     } else if (totalRaw > 0) {
       results.healthStatus = HEALTH.DEGRADED;
+    } else if (results.blocked) {
+      results.healthStatus = HEALTH.BLOCKED;
     } else if (results.failed) {
       results.healthStatus = HEALTH.ERROR;
     } else {

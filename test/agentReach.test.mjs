@@ -40,6 +40,7 @@ test("Agent Reach: parseLinkedInJobMetadata extracts company, role, location fro
 
 test("Agent Reach Scraper: Normalizes mocked CLI items into standard JobStrider schema", async () => {
   const scraper = new AgentReachScraper();
+  scraper.isAvailable = () => true;
 
   // Mock runCli method to return sample agent-reach data offline
   scraper.runCli = () => ({
