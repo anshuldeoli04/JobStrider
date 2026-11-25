@@ -3,8 +3,13 @@ import path from "path";
 
 export function syncSleep(ms) {
   const target = Date.now() + ms;
-  while (Date.now() < target) {
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.max(1, target - Date.now()));
+  try {
+    const int32 = new Int32Array(new SharedArrayBuffer(4));
+    while (Date.now() < target) {
+      Atomics.wait(int32, 0, 0, Math.max(1, target - Date.now()));
+    }
+  } catch {
+    while (Date.now() < target) {}
   }
 }
 
