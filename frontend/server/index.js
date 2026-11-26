@@ -101,7 +101,13 @@ if (fs.existsSync(distDir)) {
     if (req.accepts('html')) {
       const indexHtml = path.join(distDir, 'index.html');
       if (fs.existsSync(indexHtml)) {
-        return res.sendFile(indexHtml);
+        try {
+          const html = fs.readFileSync(indexHtml, 'utf8');
+          res.type('html');
+          return res.send(html);
+        } catch {
+          return res.sendFile(indexHtml);
+        }
       }
     }
     next();

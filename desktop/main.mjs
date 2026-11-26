@@ -3,6 +3,10 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+// Prevent Chromium disk cache lockups / Access Denied issues on Windows
+app.commandLine.appendSwitch('disable-http-cache');
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
@@ -13,6 +17,12 @@ const workspaceDir = path.join(userDataDir, 'workspace');
 if (!fs.existsSync(workspaceDir)) {
   fs.mkdirSync(workspaceDir, { recursive: true });
 }
+
+// Clean stale lockfile or corrupted cache folders from previous crashes
+try {
+  const lockfile = path.join(userDataDir, 'lockfile');
+  if (fs.existsSync(lockfile)) fs.unlinkSync(lockfile);
+} catch {}
 
 process.env.JOBSTRIDER_TEST_WORKSPACE = workspaceDir;
 process.env.HOST = '127.0.0.1';
@@ -30,6 +40,20 @@ let apiServer = null;
 async function startBackend() {
   const serverModule = await import('../frontend/server/index.js');
   return serverModule.server;
+}
+
+async function waitForServer(port, maxRetries = 40) {
+  const url = `http://127.0.0.1:${port}/health`;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return true;
+    } catch {
+      // Socket not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return false;
 }
 
 async function createWindow(port) {
@@ -50,7 +74,25 @@ async function createWindow(port) {
   });
 
   const appUrl = `http://127.0.0.1:${port}`;
-  await mainWindow.loadURL(appUrl);
+
+  // Retry loadURL in case of transient network stack initialization delay
+  let loaded = false;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 8; attempt++) {
+    try {
+      await mainWindow.loadURL(appUrl);
+      loaded = true;
+      break;
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[JobStrider] Navigation attempt ${attempt} failed: ${err.message}`);
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+
+  if (!loaded) {
+    throw lastErr || new Error(`Failed to load ${appUrl}`);
+  }
 
   // Open external links (affiliate links, course platforms, job listings) in the user's default system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -77,6 +119,10 @@ app.whenReady().then(async () => {
   try {
     apiServer = await startBackend();
     const port = process.env.PORT || 3001;
+    const isReady = await waitForServer(port);
+    if (!isReady) {
+      throw new Error(`JobStrider backend server failed to bind to port ${port} within 10 seconds.`);
+    }
     await createWindow(port);
   } catch (err) {
     console.error('Failed to start JobStrider desktop application:', err);
