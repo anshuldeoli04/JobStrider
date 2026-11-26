@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, dialog } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -80,6 +80,11 @@ app.whenReady().then(async () => {
     await createWindow(port);
   } catch (err) {
     console.error('Failed to start JobStrider desktop application:', err);
+    dialog.showErrorBox(
+      'JobStrider Startup Error',
+      `Failed to start backend server:\n\n${err?.stack || err?.message || err}`
+    );
+    app.quit();
   }
 
   app.on('activate', () => {

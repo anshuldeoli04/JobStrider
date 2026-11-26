@@ -72,8 +72,7 @@
       "enableCookieEncryption": true,
       "enableNodeOptionsEnvironmentVariable": false,
       "enableNodeCliInspectArguments": false,
-      "enableEmbeddedAsarIntegrityValidation": true,
-      "onlyLoadAppFromAsar": true
+      "enableEmbeddedAsarIntegrityValidation": true
     },
     "directories": {
       "output": "dist-electron"

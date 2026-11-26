@@ -1,5 +1,3 @@
-import pdfParse from 'pdf-parse';
-
 function normalizeLine(line) {
   return line
     .replace(/\u2022/g, '-')
@@ -59,6 +57,20 @@ export function normalizeCvText(rawText) {
 }
 
 export async function extractTextFromPdfBuffer(buffer) {
-  const parsed = await pdfParse(buffer);
-  return normalizeCvText(parsed.text || '');
+  const mod = await import('pdf-parse');
+  const PDFParseClass = mod.PDFParse || mod.default?.PDFParse;
+  if (typeof PDFParseClass === 'function') {
+    const parser = new PDFParseClass({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return normalizeCvText(result?.text || '');
+    } finally {
+      await parser.destroy?.().catch(() => {});
+    }
+  }
+  if (typeof mod.default === 'function') {
+    const parsed = await mod.default(buffer);
+    return normalizeCvText(parsed?.text || '');
+  }
+  throw new Error('PDF parser module could not be initialized.');
 }
