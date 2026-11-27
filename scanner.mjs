@@ -9,7 +9,10 @@ import {
   SCAN_RESULTS_FILE,
 } from "./config-utils.mjs";
 
-const COMPANIES_FILE = "./companies.json";
+const __scannerDir = path.dirname(fileURLToPath(import.meta.url));
+const COMPANIES_FILE = fs.existsSync(path.resolve(__scannerDir, "companies.json"))
+  ? path.resolve(__scannerDir, "companies.json")
+  : path.resolve(process.cwd(), "companies.json");
 import { logger } from "./logger.mjs";
 import { jobKey, isSameJob } from "./jobIdentity.mjs";
 import { HEALTH, FAILING } from "./health.mjs";
@@ -262,7 +265,14 @@ async function main() {
     if (evaluate.toLowerCase() === "y") {
       const { spawn } = await import("child_process");
       const scanEvaluateScript = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "scan-evaluate.mjs");
-      spawn(process.execPath, [scanEvaluateScript], { stdio: "inherit" });
+      const execCwd = path.dirname(fileURLToPath(import.meta.url)).includes('.asar')
+        ? (process.env.JOBSTRIDER_TEST_WORKSPACE || process.cwd())
+        : path.dirname(fileURLToPath(import.meta.url));
+      const childEnv = { ...process.env };
+      if (process.env.ELECTRON_RUN_AS_NODE || process.versions?.electron) {
+        childEnv.ELECTRON_RUN_AS_NODE = "1";
+      }
+      spawn(process.execPath, [scanEvaluateScript], { stdio: "inherit", cwd: execCwd, env: childEnv });
     }
   }
 }

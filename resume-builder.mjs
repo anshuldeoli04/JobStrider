@@ -298,8 +298,16 @@ function renderHTML(d, template) {
 }
 function generatePDF(htmlFile, pdfFile) {
   return new Promise((resolve, reject) => {
+    const execCwd = REPO_ROOT.includes('.asar')
+      ? (process.env.JOBSTRIDER_TEST_WORKSPACE || process.cwd())
+      : REPO_ROOT;
+    const childEnv = { ...process.env };
+    if (process.env.ELECTRON_RUN_AS_NODE || process.versions?.electron) {
+      childEnv.ELECTRON_RUN_AS_NODE = "1";
+    }
     const proc = spawn(process.execPath, [path.resolve(REPO_ROOT, "generate-pdf.mjs"), htmlFile, pdfFile], {
-      cwd: REPO_ROOT,
+      cwd: execCwd,
+      env: childEnv,
     });
     let out = "";
     proc.stdout.on("data", (d) => {

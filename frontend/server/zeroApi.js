@@ -251,10 +251,18 @@ function buildConfigPayload() {
   };
 }
 
+function getExecutionCwd() {
+  if (repoRoot.includes('.asar')) {
+    return workspaceRoot;
+  }
+  return repoRoot;
+}
+
 function getIsolatedChildEnv(extra = {}) {
   const env = parseEnvSafe();
   return {
     ...process.env,
+    ELECTRON_RUN_AS_NODE: '1',
     JOBSTRIDER_ISOLATED: '1',
     JOBSTRIDER_DATA_DIR: dataDir,
     JOB_OPS_DATA_DIR: dataDir,
@@ -771,7 +779,7 @@ router.post('/scan', (req, res) => {
   broadcastStream('scan', { type: 'log', message: stream.logs[0] });
 
   const child = spawn(process.execPath, args, {
-    cwd: repoRoot,
+    cwd: getExecutionCwd(),
     env: getIsolatedChildEnv()
   });
   stream.child = child;
@@ -1033,7 +1041,7 @@ router.post('/evaluate', async (req, res) => {
   broadcastStream('evaluate', { type: 'log', message: stream.logs[0] });
 
   const child = spawn(process.execPath, args, {
-    cwd: repoRoot,
+    cwd: getExecutionCwd(),
     env: getIsolatedChildEnv()
   });
 
@@ -1166,7 +1174,7 @@ router.post('/resume', (req, res) => {
   }
 
   const child = spawn(process.execPath, args, {
-    cwd: repoRoot,
+    cwd: getExecutionCwd(),
     env: getIsolatedChildEnv()
   });
 

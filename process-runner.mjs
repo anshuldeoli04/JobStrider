@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const ALLOWED_ENV_VARS = [
+  "ELECTRON_RUN_AS_NODE",
   "PATH",
   "Path",
   "HOME",
@@ -91,10 +94,22 @@ export function runNodeScript(script, extraArgs = [], options = {}) {
   const logs = [];
   const childStdio = stdio || ["pipe", "pipe", "pipe"];
 
+  const repoRoot = path.dirname(fileURLToPath(import.meta.url));
+  const scriptPath = path.isAbsolute(script) ? script : path.resolve(repoRoot, script);
+  const executionCwd = repoRoot.includes(".asar")
+    ? (process.env.JOBSTRIDER_TEST_WORKSPACE || (process.env.JOBSTRIDER_DATA_DIR ? path.dirname(process.env.JOBSTRIDER_DATA_DIR) : process.cwd()))
+    : repoRoot;
+
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [script, ...extraArgs], {
+    const childEnv = sanitizeChildEnv(process.env, env);
+    if (process.env.ELECTRON_RUN_AS_NODE || process.versions?.electron) {
+      childEnv.ELECTRON_RUN_AS_NODE = "1";
+    }
+
+    const child = spawn(process.execPath, [scriptPath, ...extraArgs], {
+      cwd: executionCwd,
       stdio: childStdio,
-      env: sanitizeChildEnv(process.env, env),
+      env: childEnv,
     });
 
     if (options.stdinText && child.stdin) {
