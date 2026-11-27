@@ -67,13 +67,6 @@
     "productName": "JobStrider",
     "npmRebuild": false,
     "asar": true,
-    "electronFuses": {
-      "runAsNode": false,
-      "enableCookieEncryption": true,
-      "enableNodeOptionsEnvironmentVariable": false,
-      "enableNodeCliInspectArguments": false,
-      "enableEmbeddedAsarIntegrityValidation": true
-    },
     "directories": {
       "output": "dist-electron"
     },
