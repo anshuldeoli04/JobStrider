@@ -1,6 +1,6 @@
-import { ensureJsonFile, readJson, writeJson } from './fileDb.js';
+import { ensureJsonFile, readJson, writeJson, resolveDataPath } from './fileDb.js';
 
-const sessionFile = new URL('../data/session.json', import.meta.url);
+const sessionFile = resolveDataPath('session.json');
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_HOURS || 24) * 60 * 60 * 1000;
 
 await ensureJsonFile(sessionFile, { userId: null, expiresAt: null });

@@ -1,6 +1,6 @@
-import { ensureJsonFile, readJson, writeJson } from './fileDb.js';
+import { ensureJsonFile, readJson, writeJson, resolveDataPath } from './fileDb.js';
 
-const activityFile = new URL('../data/activity.json', import.meta.url);
+const activityFile = resolveDataPath('activity.json');
 
 await ensureJsonFile(activityFile, [
   {

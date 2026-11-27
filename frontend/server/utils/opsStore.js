@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const rootDir = fileURLToPath(new URL('../../../', import.meta.url));
+const rootDir = process.env.JOBSTRIDER_TEST_WORKSPACE
+  ? path.resolve(process.env.JOBSTRIDER_TEST_WORKSPACE)
+  : fileURLToPath(new URL('../../../', import.meta.url));
 const getDataDir = () =>
   process.env.JOB_OPS_DATA_DIR ? path.resolve(process.env.JOB_OPS_DATA_DIR) : path.join(rootDir, 'data');
 const getOpsFile = () => path.join(getDataDir(), 'ops-settings.json');

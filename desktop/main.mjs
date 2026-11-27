@@ -34,6 +34,22 @@ if (!gotTheLock) {
   app.quit();
 }
 
+const logPath = path.join(userDataDir, 'jobstrider.log');
+function logDebug(msg) {
+  try {
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch {}
+}
+
+process.on('uncaughtException', (err) => {
+  logDebug(`[process uncaughtException] ${err?.stack || err}`);
+  console.error('[JobStrider uncaughtException]', err);
+});
+process.on('unhandledRejection', (err) => {
+  logDebug(`[process unhandledRejection] ${err?.stack || err}`);
+  console.error('[JobStrider unhandledRejection]', err);
+});
+
 let mainWindow = null;
 let apiServer = null;
 

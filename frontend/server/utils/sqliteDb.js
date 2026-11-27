@@ -3,8 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
-const dataDir = path.resolve(repoRoot, 'data');
+const baseWorkspace = process.env.JOBSTRIDER_TEST_WORKSPACE
+  ? path.resolve(process.env.JOBSTRIDER_TEST_WORKSPACE)
+  : fileURLToPath(new URL('../../../', import.meta.url));
+const dataDir = path.resolve(baseWorkspace, 'data');
 const dbFile = path.resolve(dataDir, 'jobstrider-server.db');
 
 let _sqliteDb = null;

@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { query } from './db.js';
 import { decryptSecret } from './secrets.js';
 
-const workspaceRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const workspaceRoot = process.env.JOBSTRIDER_TEST_WORKSPACE
+  ? path.resolve(process.env.JOBSTRIDER_TEST_WORKSPACE)
+  : fileURLToPath(new URL('../../../', import.meta.url));
 
 function normalizeExperienceYears(levelSlug) {
   if (levelSlug === 'fresher') return 0;

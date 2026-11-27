@@ -1,5 +1,5 @@
 import express from 'express';
-import { readJson, writeJson, ensureJsonFile } from '../utils/fileDb.js';
+import { readJson, writeJson, ensureJsonFile, resolveDataPath } from '../utils/fileDb.js';
 import { query } from '../utils/db.js';
 import { requireCurrentUserId } from '../utils/currentUser.js';
 import { mapScanRow } from '../utils/sqlMappers.js';
@@ -14,7 +14,7 @@ const allowedSources = new Set(['greenhouse', 'lever', 'ashby', 'careers_page', 
 
 function getScanStreamFile(userId) {
   const safeId = String(userId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
-  return new URL(`../data/scan-stream-${safeId}.json`, import.meta.url);
+  return resolveDataPath(`scan-stream-${safeId}.json`);
 }
 
 router.get('/', async (req, res, next) => {

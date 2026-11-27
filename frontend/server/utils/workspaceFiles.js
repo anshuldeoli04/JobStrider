@@ -2,7 +2,9 @@ import path from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const workspaceRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const workspaceRoot = process.env.JOBSTRIDER_TEST_WORKSPACE
+  ? path.resolve(process.env.JOBSTRIDER_TEST_WORKSPACE)
+  : fileURLToPath(new URL('../../../', import.meta.url));
 
 export async function readWorkspaceJson(relativePath, fallbackValue) {
   try {
