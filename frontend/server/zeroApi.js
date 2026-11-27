@@ -928,7 +928,7 @@ router.post('/evaluate', async (req, res) => {
     broadcastStream('evaluate', { type: 'log', message: stream.logs[0] });
 
     const child = spawn(process.execPath, args, {
-      cwd: repoRoot,
+      cwd: getExecutionCwd(),
       env: getIsolatedChildEnv()
     });
 
