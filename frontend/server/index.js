@@ -15,21 +15,34 @@ app.disable('x-powered-by');
 app.set('trust proxy', 'loopback');
 app.use(
   helmet({
-    crossOriginEmbedderPolicy: false
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: false
   })
 );
 
 const port = process.env.PORT || 3001;
 const host = process.env.HOST || '127.0.0.1';
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+const configuredOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (configuredOrigins.includes(origin)) return true;
+  try {
+    const parsed = new URL(origin);
+    if (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') {
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
       return callback(new Error('CORS origin not allowed.'));

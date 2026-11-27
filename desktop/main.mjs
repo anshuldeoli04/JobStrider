@@ -89,6 +89,10 @@ async function createWindow(port) {
     autoHideMenuBar: true,
   });
 
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    logDebug(`[Renderer L${level}] ${message} (${sourceId}:${line})`);
+  });
+
   const appUrl = `http://127.0.0.1:${port}`;
 
   // Retry loadURL in case of transient network stack initialization delay
@@ -110,6 +114,9 @@ async function createWindow(port) {
     throw lastErr || new Error(`Failed to load ${appUrl}`);
   }
 
+  mainWindow.show();
+  mainWindow.focus();
+
   // Open external links (affiliate links, course platforms, job listings) in the user's default system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -127,6 +134,7 @@ async function createWindow(port) {
 app.on('second-instance', () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
     mainWindow.focus();
   }
 });
